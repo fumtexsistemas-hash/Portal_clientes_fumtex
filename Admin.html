@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <?!= include('Styles'); ?>
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <span class="eyebrow">FUMTEX</span>
+        <h1>Admin Portal Clientes</h1>
+      </div>
+      <button type="button" onclick="instalarPortal()">Instalar/verificar hojas</button>
+    </header>
+
+    <main class="layout">
+      <section class="grid-3">
+        <form class="panel" onsubmit="crearPublicacionUi(event)">
+          <h2>Nueva publicacion</h2>
+          <input name="idPortalCliente" placeholder="ID_PORTAL_CLIENTE" required>
+          <input name="titulo" placeholder="Titulo" required>
+          <input name="categoria" placeholder="Categoria">
+          <textarea name="contenido" placeholder="Contenido" required></textarea>
+          <label class="check"><input name="visible" type="checkbox" checked> Visible</label>
+          <button type="submit">Publicar</button>
+        </form>
+
+        <form class="panel" onsubmit="crearMonitoreoUi(event)">
+          <h2>Nuevo monitoreo</h2>
+          <input name="idPortalCliente" placeholder="ID_PORTAL_CLIENTE" required>
+          <input name="fecha" type="date" required>
+          <input name="sector" placeholder="Sector">
+          <input name="tipo" placeholder="Tipo">
+          <textarea name="resultado" placeholder="Resultado" required></textarea>
+          <textarea name="observaciones" placeholder="Observaciones"></textarea>
+          <label class="check"><input name="visible" type="checkbox" checked> Visible</label>
+          <button type="submit">Guardar monitoreo</button>
+        </form>
+
+        <form class="panel" onsubmit="crearDocumentoUi(event)">
+          <h2>Nuevo documento</h2>
+          <input name="idPortalCliente" placeholder="ID_PORTAL_CLIENTE" required>
+          <input name="titulo" placeholder="Titulo" required>
+          <input name="tipo" placeholder="Tipo">
+          <input name="url" placeholder="URL del documento" required>
+          <textarea name="descripcion" placeholder="Descripcion"></textarea>
+          <label class="check"><input name="visible" type="checkbox" checked> Visible</label>
+          <button type="submit">Guardar documento</button>
+        </form>
+      </section>
+
+      <p id="adminMensaje" class="message"></p>
+    </main>
+    <?!= include('Scripts'); ?>
+  </body>
+</html>

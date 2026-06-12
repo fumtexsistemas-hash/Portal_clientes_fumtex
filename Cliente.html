@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <?!= include('Styles'); ?>
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <span class="eyebrow">FUMTEX</span>
+        <h1>Portal cliente</h1>
+      </div>
+      <button type="button" onclick="limpiarSesionCliente()">Salir</button>
+    </header>
+
+    <main class="layout">
+      <section class="panel">
+        <h2 id="clienteNombre">Cliente</h2>
+        <p id="clienteDetalle" class="muted">Cargando datos...</p>
+      </section>
+
+      <section class="grid-3">
+        <article class="panel">
+          <h3>Publicaciones</h3>
+          <div id="listaPublicaciones" class="list"></div>
+        </article>
+        <article class="panel">
+          <h3>Monitoreos</h3>
+          <div id="listaMonitoreos" class="list"></div>
+        </article>
+        <article class="panel">
+          <h3>Documentos</h3>
+          <div id="listaDocumentos" class="list"></div>
+        </article>
+      </section>
+    </main>
+    <?!= include('Scripts'); ?>
+    <script>iniciarPortalCliente();</script>
+  </body>
+</html>

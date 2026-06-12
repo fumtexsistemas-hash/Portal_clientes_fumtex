@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <?!= include('Styles'); ?>
+  </head>
+  <body>
+    <main class="login-shell">
+      <section class="panel login-panel">
+        <span class="eyebrow">FUMTEX</span>
+        <h1>Portal Clientes</h1>
+        <p>Acceso para consultar publicaciones, monitoreos y documentos compartidos.</p>
+
+        <label>CUIT
+          <input id="loginCuit" type="text" autocomplete="username">
+        </label>
+        <label>Email
+          <input id="loginEmail" type="email" autocomplete="email">
+        </label>
+        <label>Clave
+          <input id="loginClave" type="password" autocomplete="current-password">
+        </label>
+
+        <button type="button" onclick="loginClienteUi()">Ingresar</button>
+        <p id="loginMensaje" class="message"></p>
+      </section>
+    </main>
+    <?!= include('Scripts'); ?>
+  </body>
+</html>
