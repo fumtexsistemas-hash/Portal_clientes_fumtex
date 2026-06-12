@@ -3,7 +3,20 @@ function obtenerPublicacionesCliente(idPortalCliente, token) {
     PORTAL_CONFIG.HOJAS.PUBLICACIONES,
     idPortalCliente,
     token,
-    ['ID_PUBLICACION', 'TITULO', 'CATEGORIA', 'CONTENIDO', 'FECHA_PUBLICACION', 'FECHA_CARGA']
+    [
+      'ID_PUBLICACION',
+      'ID_VISITA_ORIGEN',
+      'FECHA_VISITA',
+      'SUCURSAL',
+      'TIPO_SERVICIO',
+      'TITULO',
+      'CATEGORIA',
+      'ESTADO_PUBLICACION',
+      'RESUMEN_CLIENTE',
+      'CONTENIDO',
+      'FECHA_PUBLICACION',
+      'FECHA_CARGA'
+    ]
   );
 }
 
@@ -12,7 +25,18 @@ function obtenerMonitoreosCliente(idPortalCliente, token) {
     PORTAL_CONFIG.HOJAS.MONITOREOS,
     idPortalCliente,
     token,
-    ['ID_MONITOREO', 'FECHA', 'SECTOR', 'TIPO', 'RESULTADO', 'OBSERVACIONES']
+    [
+      'ID_MONITOREO',
+      'ID_PUBLICACION',
+      'FECHA',
+      'SECTOR',
+      'PUNTO_CONTROL',
+      'TIPO',
+      'RESULTADO',
+      'NOVEDAD',
+      'ACCION_CORRECTIVA',
+      'OBSERVACIONES'
+    ]
   );
 }
 
@@ -21,7 +45,16 @@ function obtenerDocumentosCliente(idPortalCliente, token) {
     PORTAL_CONFIG.HOJAS.DOCUMENTOS,
     idPortalCliente,
     token,
-    ['ID_DOCUMENTO', 'TITULO', 'TIPO', 'URL', 'DESCRIPCION', 'FECHA_CARGA']
+    [
+      'ID_DOCUMENTO',
+      'ID_PUBLICACION',
+      'TITULO',
+      'TIPO',
+      'URL',
+      'CARPETA_DRIVE_ID',
+      'DESCRIPCION',
+      'FECHA_CARGA'
+    ]
   );
 }
 
