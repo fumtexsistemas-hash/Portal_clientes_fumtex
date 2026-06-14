@@ -19,14 +19,17 @@
     setMessage('loginMensaje', 'Validando acceso...');
     google.script.run
       .withSuccessHandler(function(res) {
+        console.log('respuesta loginCliente', res);
         if (!res || !res.ok) {
           setMessage('loginMensaje', res && res.mensaje ? res.mensaje : 'No se pudo ingresar.', true);
           return;
         }
+        console.log('token portal cliente', res.cliente && res.cliente.token ? 'recibido' : 'sin token');
         sessionStorage.setItem('portalCliente', JSON.stringify(res.cliente));
         window.location.search = '?app=cliente';
       })
       .withFailureHandler(function(error) {
+        console.error('error loginCliente', error);
         setMessage('loginMensaje', error.message || String(error), true);
       })
       .loginCliente(
@@ -37,52 +40,102 @@
   }
 
   function iniciarPortalCliente() {
-    const raw = sessionStorage.getItem('portalCliente');
-    if (!raw) {
-      window.location.search = '';
+    try {
+      asegurarLayoutCliente();
+      const raw = sessionStorage.getItem('portalCliente');
+      if (!raw) {
+        mostrarErrorPortalCliente('No hay una sesion activa. Volve a ingresar desde el login.');
+        return;
+      }
+
+      const cliente = JSON.parse(raw);
+      console.log('sesion portal cliente', cliente);
+      console.log('token portal cliente', cliente && cliente.token ? 'disponible' : 'faltante');
+
+      if (!cliente || !cliente.idPortalCliente || !cliente.token) {
+        mostrarErrorPortalCliente('La sesion esta incompleta. Volve a iniciar sesion.');
+        return;
+      }
+
+      document.getElementById('clienteNombre').textContent = cliente.nombreFantasia || cliente.razonSocial || 'Cliente';
+      document.getElementById('clienteDetalle').textContent = (cliente.cuit || '') + ' - ' + (cliente.email || '');
+      cargarBloqueCliente('listaPublicaciones', 'obtenerPublicacionesCliente', cliente.idPortalCliente, cliente.token, renderPublicacion, 'publicaciones');
+      cargarBloqueCliente('listaMonitoreos', 'obtenerMonitoreosCliente', cliente.idPortalCliente, cliente.token, renderMonitoreo, 'monitoreos');
+      cargarBloqueCliente('listaDocumentos', 'obtenerDocumentosCliente', cliente.idPortalCliente, cliente.token, renderDocumento, 'documentos');
+    } catch (error) {
+      console.error('error iniciarPortalCliente', error);
+      mostrarErrorPortalCliente(error.message || String(error));
+    }
+  }
+
+  function asegurarLayoutCliente() {
+    ['listaPublicaciones', 'listaMonitoreos', 'listaDocumentos'].forEach(function(id) {
+      const target = document.getElementById(id);
+      if (target) target.innerHTML = '<p class="muted">Cargando...</p>';
+    });
+  }
+
+  function mostrarErrorPortalCliente(mensaje) {
+    const detalle = document.getElementById('clienteDetalle');
+    if (detalle) {
+      detalle.textContent = mensaje || 'No se pudo cargar el portal.';
+      detalle.className = 'message error';
+    }
+    ['listaPublicaciones', 'listaMonitoreos', 'listaDocumentos'].forEach(function(id) {
+      const target = document.getElementById(id);
+      if (target) target.innerHTML = '<p class="message error">' + esc(mensaje || 'No disponible.') + '</p>';
+    });
+  }
+
+  function cargarBloqueCliente(targetId, fn, idPortalCliente, token, renderer, label) {
+    const target = document.getElementById(targetId);
+    if (!target) {
+      console.error('No existe contenedor', targetId);
       return;
     }
 
-    const cliente = JSON.parse(raw);
-    document.getElementById('clienteNombre').textContent = cliente.nombreFantasia || cliente.razonSocial || 'Cliente';
-    document.getElementById('clienteDetalle').textContent = cliente.cuit + ' - ' + cliente.email;
-    cargarBloqueCliente('listaPublicaciones', 'obtenerPublicacionesCliente', cliente.idPortalCliente, cliente.token, renderPublicacion);
-    cargarBloqueCliente('listaMonitoreos', 'obtenerMonitoreosCliente', cliente.idPortalCliente, cliente.token, renderMonitoreo);
-    cargarBloqueCliente('listaDocumentos', 'obtenerDocumentosCliente', cliente.idPortalCliente, cliente.token, renderDocumento);
-  }
-
-  function cargarBloqueCliente(targetId, fn, idPortalCliente, token, renderer) {
-    const target = document.getElementById(targetId);
-    target.textContent = 'Cargando...';
+    target.innerHTML = '<p class="muted">Cargando...</p>';
     google.script.run
       .withSuccessHandler(function(res) {
+        console.log(label || fn, res);
         if (!res || !res.ok) {
-          target.textContent = res && res.mensaje ? res.mensaje : 'No disponible.';
+          target.innerHTML = '<p class="message error">' + esc(res && res.mensaje ? res.mensaje : 'No disponible.') + '</p>';
           return;
         }
         const items = res.items || [];
-        target.innerHTML = items.length ? items.map(renderer).join('') : '<p class="muted">Sin datos publicados.</p>';
+        target.innerHTML = items.length ? items.map(function(item) {
+          try {
+            return renderer(item);
+          } catch (error) {
+            console.error('error render ' + (label || fn), error, item);
+            return '<article class="item"><strong>Error al mostrar registro</strong><small>' + esc(error.message || String(error)) + '</small></article>';
+          }
+        }).join('') : '<p class="muted">Sin datos publicados.</p>';
       })
       .withFailureHandler(function(error) {
-        target.textContent = error.message || String(error);
+        console.error('error ' + (label || fn), error);
+        target.innerHTML = '<p class="message error">' + esc(error.message || String(error)) + '</p>';
       })[fn](idPortalCliente, token);
   }
 
   function renderPublicacion(item) {
-    return '<article class="item"><strong>' + esc(item.TITULO) + '</strong><small>' +
-      esc(item.CATEGORIA || item.FECHA_PUBLICACION || '') + '</small><p>' + esc(item.CONTENIDO) + '</p></article>';
+    const subtitulo = [item.FECHA_VISITA, item.SUCURSAL, item.TIPO_SERVICIO].filter(Boolean).join(' - ');
+    const resumen = item.RESUMEN_CLIENTE || item.CONTENIDO || '';
+    return '<article class="item"><strong>' + esc(item.TITULO || 'Publicacion') + '</strong><small>' +
+      esc(subtitulo || item.CATEGORIA || item.FECHA_PUBLICACION || '') + '</small><p>' + esc(resumen) + '</p></article>';
   }
 
   function renderMonitoreo(item) {
-    return '<article class="item"><strong>' + esc(item.FECHA) + ' - ' + esc(item.SECTOR) +
-      '</strong><small>' + esc(item.TIPO) + '</small><p>' + esc(item.RESULTADO) +
-      '</p><small>' + esc(item.OBSERVACIONES) + '</small></article>';
+    return '<article class="item"><strong>' + esc(item.FECHA || '') + ' - ' + esc(item.SECTOR || '') +
+      '</strong><small>' + esc(item.PUNTO_CONTROL || item.TIPO || '') + '</small><p>' + esc(item.RESULTADO || '') +
+      '</p><small>' + esc(item.NOVEDAD || item.ACCION_CORRECTIVA || item.OBSERVACIONES || '') + '</small></article>';
   }
 
   function renderDocumento(item) {
-    return '<article class="item"><strong>' + esc(item.TITULO) + '</strong><small>' +
-      esc(item.TIPO) + '</small><p>' + esc(item.DESCRIPCION) +
-      '</p><a href="' + esc(item.URL) + '" target="_blank">Abrir documento</a></article>';
+    const url = item.URL || '';
+    return '<article class="item"><strong>' + esc(item.TITULO || 'Documento') + '</strong><small>' +
+      esc(item.TIPO || '') + '</small><p>' + esc(item.DESCRIPCION || '') +
+      '</p>' + (url ? '<a href="' + esc(url) + '" target="_blank">Abrir documento</a>' : '<small>Sin URL disponible</small>') + '</article>';
   }
 
   function limpiarSesionCliente() {
