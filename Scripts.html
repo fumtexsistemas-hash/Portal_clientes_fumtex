@@ -47,6 +47,15 @@
     mostrarLoginCliente();
 
     try {
+      const params = new URLSearchParams(window.location.search || '');
+      if (params.get('logout') === '1' || params.get('forceLogin') === '1') {
+        console.log('logout detectado');
+        limpiarDatosSesionPortal();
+        mostrarLoginCliente();
+        setMessage('loginMensaje', 'Ingresa nuevamente para continuar.');
+        return;
+      }
+
       const raw = sessionStorage.getItem('portalCliente');
       if (!raw) return;
 
@@ -58,13 +67,14 @@
       iniciarPortalCliente();
     } catch (error) {
       console.error('error recuperando sesion portal', error);
-      sessionStorage.removeItem('portalCliente');
+      limpiarDatosSesionPortal();
       mostrarLoginCliente();
       setMessage('loginMensaje', 'No se pudo recuperar la sesion. Volve a ingresar.', true);
     }
   }
 
   function mostrarLoginCliente() {
+    console.log('mostrando login');
     const login = document.getElementById('clienteLoginPanel');
     const panel = document.getElementById('clientePanel');
     if (login) login.classList.remove('hidden');
@@ -72,10 +82,31 @@
   }
 
   function mostrarPanelCliente() {
+    console.log('mostrando panel');
     const login = document.getElementById('clienteLoginPanel');
     const panel = document.getElementById('clientePanel');
     if (login) login.classList.add('hidden');
     if (panel) panel.classList.remove('hidden');
+  }
+
+  function limpiarDatosSesionPortal() {
+    window.portalSession = null;
+    sessionStorage.removeItem('portalCliente');
+    sessionStorage.removeItem('portalToken');
+    sessionStorage.removeItem('idPortalCliente');
+    console.log('sesion limpiada');
+  }
+
+  function limpiarMensajesPanelCliente() {
+    const detalle = document.getElementById('clienteDetalle');
+    if (detalle) {
+      detalle.textContent = '';
+      detalle.className = 'muted';
+    }
+    ['listaPublicaciones', 'listaMonitoreos', 'listaDocumentos'].forEach(function(id) {
+      const target = document.getElementById(id);
+      if (target) target.innerHTML = '<p class="muted">Sin datos publicados.</p>';
+    });
   }
 
   function iniciarPortalCliente() {
@@ -176,8 +207,12 @@
   }
 
   function limpiarSesionCliente() {
-    sessionStorage.removeItem('portalCliente');
-    window.portalSession = null;
+    cerrarSesionCliente();
+  }
+
+  function cerrarSesionCliente() {
+    limpiarDatosSesionPortal();
+    limpiarMensajesPanelCliente();
     mostrarLoginCliente();
     setMessage('loginMensaje', 'Sesion cerrada.');
   }
