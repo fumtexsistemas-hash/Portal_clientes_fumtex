@@ -68,22 +68,55 @@
   }
 
   .brand-logo {
-    width: 58px;
-    height: 58px;
-    object-fit: contain;
-    border-radius: 14px;
-    background: #fff;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #ffffff 0%, #f2fbf3 100%);
     border: 1px solid var(--line);
-    padding: 6px;
+    padding: 8px 10px;
+  }
+
+  .brand-mark {
+    display: inline-grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--brand-dark), var(--brand));
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 800;
+    box-shadow: 0 8px 18px rgba(58, 142, 64, 0.24);
+  }
+
+  .brand-text {
+    display: grid;
+    gap: 1px;
+    line-height: 1.05;
+    text-align: left;
+  }
+
+  .brand-name {
+    color: var(--brand-dark);
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+  }
+
+  .brand-subtitle {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 
   .login-logo {
-    display: block;
-    width: 112px;
-    max-width: 60%;
-    height: auto;
-    object-fit: contain;
-    margin: 0 auto 14px;
+    justify-content: center;
+    margin: 0 auto 16px;
   }
 
   .layout {
