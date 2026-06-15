@@ -14,27 +14,53 @@
     </header>
 
     <main class="layout">
-      <section class="panel">
-        <h2 id="clienteNombre">Cliente</h2>
-        <p id="clienteDetalle" class="muted">Cargando datos...</p>
+      <section id="clienteLoginPanel" class="panel login-panel">
+        <h2>Ingresar al portal</h2>
+        <p class="muted">Usa tu CUIT, email y clave para consultar informacion publicada.</p>
+
+        <label>CUIT
+          <input id="loginCuit" type="text" autocomplete="username">
+        </label>
+        <label>Email
+          <input id="loginEmail" type="email" autocomplete="email">
+        </label>
+        <label>Clave
+          <input id="loginClave" type="password" autocomplete="current-password">
+        </label>
+
+        <button type="button" onclick="loginClienteUi()">Ingresar</button>
+        <p id="loginMensaje" class="message"></p>
       </section>
 
-      <section class="grid-3">
-        <article class="panel">
-          <h3>Publicaciones</h3>
-          <div id="listaPublicaciones" class="list"></div>
-        </article>
-        <article class="panel">
-          <h3>Monitoreos</h3>
-          <div id="listaMonitoreos" class="list"></div>
-        </article>
-        <article class="panel">
-          <h3>Documentos</h3>
-          <div id="listaDocumentos" class="list"></div>
-        </article>
+      <section id="clientePanel" class="hidden">
+        <section class="panel">
+        <h2 id="clienteNombre">Cliente</h2>
+        <p id="clienteDetalle" class="muted">Cargando datos...</p>
+        </section>
+
+        <section class="grid-3">
+          <article class="panel">
+            <h3>Publicaciones</h3>
+            <div id="listaPublicaciones" class="list">
+              <p class="muted">Sin datos publicados.</p>
+            </div>
+          </article>
+          <article class="panel">
+            <h3>Monitoreos</h3>
+            <div id="listaMonitoreos" class="list">
+              <p class="muted">Sin datos publicados.</p>
+            </div>
+          </article>
+          <article class="panel">
+            <h3>Documentos</h3>
+            <div id="listaDocumentos" class="list">
+              <p class="muted">Sin datos publicados.</p>
+            </div>
+          </article>
+        </section>
       </section>
     </main>
     <?!= include('Scripts'); ?>
-    <script>iniciarPortalCliente();</script>
+    <script>inicializarPantallaCliente();</script>
   </body>
 </html>

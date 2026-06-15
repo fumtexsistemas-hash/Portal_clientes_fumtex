@@ -16,6 +16,7 @@
   }
 
   function loginClienteUi() {
+    console.log('login iniciado');
     setMessage('loginMensaje', 'Validando acceso...');
     google.script.run
       .withSuccessHandler(function(res) {
@@ -25,8 +26,10 @@
           return;
         }
         console.log('token portal cliente', res.cliente && res.cliente.token ? 'recibido' : 'sin token');
+        window.portalSession = res.cliente;
         sessionStorage.setItem('portalCliente', JSON.stringify(res.cliente));
-        window.location.search = '?app=cliente';
+        mostrarPanelCliente();
+        iniciarPortalCliente();
       })
       .withFailureHandler(function(error) {
         console.error('error loginCliente', error);
@@ -39,16 +42,47 @@
       );
   }
 
-  function iniciarPortalCliente() {
+  function inicializarPantallaCliente() {
+    console.log('inicializarPantallaCliente');
+    mostrarLoginCliente();
+
     try {
-      asegurarLayoutCliente();
       const raw = sessionStorage.getItem('portalCliente');
-      if (!raw) {
-        mostrarErrorPortalCliente('No hay una sesion activa. Volve a ingresar desde el login.');
-        return;
-      }
+      if (!raw) return;
 
       const cliente = JSON.parse(raw);
+      if (!cliente || !cliente.idPortalCliente || !cliente.token) return;
+
+      window.portalSession = cliente;
+      mostrarPanelCliente();
+      iniciarPortalCliente();
+    } catch (error) {
+      console.error('error recuperando sesion portal', error);
+      sessionStorage.removeItem('portalCliente');
+      mostrarLoginCliente();
+      setMessage('loginMensaje', 'No se pudo recuperar la sesion. Volve a ingresar.', true);
+    }
+  }
+
+  function mostrarLoginCliente() {
+    const login = document.getElementById('clienteLoginPanel');
+    const panel = document.getElementById('clientePanel');
+    if (login) login.classList.remove('hidden');
+    if (panel) panel.classList.add('hidden');
+  }
+
+  function mostrarPanelCliente() {
+    const login = document.getElementById('clienteLoginPanel');
+    const panel = document.getElementById('clientePanel');
+    if (login) login.classList.add('hidden');
+    if (panel) panel.classList.remove('hidden');
+  }
+
+  function iniciarPortalCliente() {
+    try {
+      console.log('iniciarPortalCliente ejecutado');
+      asegurarLayoutCliente();
+      const cliente = window.portalSession || JSON.parse(sessionStorage.getItem('portalCliente') || 'null');
       console.log('sesion portal cliente', cliente);
       console.log('token portal cliente', cliente && cliente.token ? 'disponible' : 'faltante');
 
@@ -71,7 +105,10 @@
   function asegurarLayoutCliente() {
     ['listaPublicaciones', 'listaMonitoreos', 'listaDocumentos'].forEach(function(id) {
       const target = document.getElementById(id);
-      if (target) target.innerHTML = '<p class="muted">Cargando...</p>';
+      if (!target) return;
+      if (id === 'listaPublicaciones') target.innerHTML = '<p class="muted">Cargando publicaciones...</p>';
+      if (id === 'listaMonitoreos') target.innerHTML = '<p class="muted">Cargando monitoreos...</p>';
+      if (id === 'listaDocumentos') target.innerHTML = '<p class="muted">Cargando documentos...</p>';
     });
   }
 
@@ -94,7 +131,7 @@
       return;
     }
 
-    target.innerHTML = '<p class="muted">Cargando...</p>';
+    target.innerHTML = '<p class="muted">Cargando ' + esc(label || 'datos') + '...</p>';
     google.script.run
       .withSuccessHandler(function(res) {
         console.log(label || fn, res);
@@ -140,7 +177,9 @@
 
   function limpiarSesionCliente() {
     sessionStorage.removeItem('portalCliente');
-    window.location.search = '';
+    window.portalSession = null;
+    mostrarLoginCliente();
+    setMessage('loginMensaje', 'Sesion cerrada.');
   }
 
   function instalarPortal() {
