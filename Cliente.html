@@ -6,17 +6,22 @@
   </head>
   <body>
     <header class="topbar">
-      <div>
-        <span class="eyebrow">FUMTEX</span>
-        <h1>Portal cliente</h1>
+      <div class="brand-lockup">
+        <img class="brand-logo" src="https://drive.google.com/uc?export=view&id=1mxN3ak6BhM07E-cDwdDikGUoj1d1TvTi" alt="FUMTEX Servicios Integrales">
+        <div>
+          <span class="eyebrow">FUMTEX</span>
+          <h1>Portal Clientes</h1>
+        </div>
       </div>
-      <button type="button" onclick="limpiarSesionCliente()">Salir</button>
+      <button class="secondary-button" type="button" onclick="cerrarSesionCliente()">Cerrar sesi&oacute;n</button>
     </header>
 
     <main class="layout">
       <section id="clienteLoginPanel" class="panel login-panel">
-        <h2>Ingresar al portal</h2>
-        <p class="muted">Usa tu CUIT, email y clave para consultar informacion publicada.</p>
+        <img class="login-logo" src="https://drive.google.com/uc?export=view&id=1mxN3ak6BhM07E-cDwdDikGUoj1d1TvTi" alt="FUMTEX Servicios Integrales">
+        <span class="eyebrow">FUMTEX</span>
+        <h2>Portal Clientes</h2>
+        <p class="muted">Acceso para consultar publicaciones, monitoreos y documentos compartidos.</p>
 
         <label>CUIT
           <input id="loginCuit" type="text" autocomplete="username">
@@ -30,13 +35,17 @@
 
         <button type="button" onclick="loginClienteUi()">Ingresar</button>
         <p id="loginMensaje" class="message"></p>
+        <p class="login-help">Si ten&eacute;s inconvenientes para ingresar, contactate con FUMTEX.</p>
       </section>
 
       <section id="clientePanel" class="hidden">
-        <section class="panel">
-          <h2 id="clienteNombre">Cliente</h2>
-          <p id="clienteDetalle" class="muted">Cargando datos...</p>
-          <button type="button" onclick="cerrarSesionCliente()">Cerrar sesión</button>
+        <section class="panel client-summary">
+          <div>
+            <span class="eyebrow">Portal Clientes</span>
+            <h2 id="clienteNombre">Cliente</h2>
+            <p id="clienteDetalle" class="muted">Cargando datos...</p>
+          </div>
+          <button class="secondary-button" type="button" onclick="cerrarSesionCliente()">Cerrar sesi&oacute;n</button>
         </section>
 
         <section class="grid-3">
@@ -59,6 +68,8 @@
             </div>
           </article>
         </section>
+
+        <footer class="portal-footer">FUMTEX Servicios Integrales</footer>
       </section>
     </main>
     <?!= include('Scripts'); ?>
