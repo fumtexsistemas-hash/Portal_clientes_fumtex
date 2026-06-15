@@ -2,7 +2,7 @@ function doGet(e) {
   const app = e && e.parameter ? String(e.parameter.app || '').toLowerCase() : '';
   const templateName = app === 'admin'
     ? 'Admin'
-    : (app === 'cliente' ? 'Cliente' : 'Login');
+    : 'Cliente';
 
   return HtmlService
     .createTemplateFromFile(templateName)
