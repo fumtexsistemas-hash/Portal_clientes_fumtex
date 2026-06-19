@@ -179,7 +179,7 @@
     gap: 8px;
   }
 
-  input, textarea {
+  input, textarea, select {
     width: 100%;
     border: 1px solid var(--line);
     border-radius: 12px;
@@ -192,7 +192,8 @@
   }
 
   input:focus,
-  textarea:focus {
+  textarea:focus,
+  select:focus {
     border-color: var(--brand);
     box-shadow: 0 0 0 4px rgba(79, 209, 89, 0.18);
   }
@@ -281,9 +282,61 @@
     text-align: center;
   }
 
+  .admin-layout {
+    max-width: 1280px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .admin-welcome {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .admin-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .admin-tab {
+    background: #ffffff;
+    color: var(--brand-dark);
+    border: 1px solid var(--line-strong);
+    box-shadow: none;
+    padding: 10px 14px;
+  }
+
+  .admin-tab:hover,
+  .admin-tab.active {
+    background: var(--brand);
+    color: #ffffff;
+    border-color: var(--brand);
+  }
+
+  .admin-tab-panel {
+    display: grid;
+    gap: 18px;
+  }
+
+  .admin-form {
+    display: grid;
+    gap: 10px;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px 14px;
+  }
+
   @media (max-width: 900px) {
     .grid-3 { grid-template-columns: 1fr; }
     .topbar { align-items: flex-start; flex-direction: column; }
     .client-summary { align-items: flex-start; flex-direction: column; }
+    .admin-welcome { align-items: flex-start; flex-direction: column; }
+    .form-grid { grid-template-columns: 1fr; }
   }
 </style>

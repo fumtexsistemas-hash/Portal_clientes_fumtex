@@ -217,16 +217,142 @@
     setMessage('loginMensaje', 'Sesion cerrada.');
   }
 
-  function instalarPortal() {
-    setMessage('adminMensaje', 'Verificando hojas PORTAL_...');
+  function inicializarPantallaAdmin() {
+    console.log('inicializarPantallaAdmin');
+    const token = sessionStorage.getItem('portalAdminToken');
+    if (token) {
+      window.portalAdminToken = token;
+      mostrarPanelAdmin();
+      recargarAdminListas();
+      return;
+    }
+    mostrarLoginAdmin();
+  }
+
+  function mostrarLoginAdmin() {
+    const login = document.getElementById('adminLoginPanel');
+    const panel = document.getElementById('adminAppPanel');
+    if (login) login.classList.remove('hidden');
+    if (panel) panel.classList.add('hidden');
+  }
+
+  function mostrarPanelAdmin() {
+    const login = document.getElementById('adminLoginPanel');
+    const panel = document.getElementById('adminAppPanel');
+    if (login) login.classList.add('hidden');
+    if (panel) panel.classList.remove('hidden');
+  }
+
+  function loginAdminUi(event) {
+    event.preventDefault();
+    setMessage('adminLoginMensaje', 'Validando PIN...');
     google.script.run
       .withSuccessHandler(function(res) {
-        setMessage('adminMensaje', res.mensaje || 'Listo.');
+        console.log('respuesta loginAdmin', res);
+        if (!res || !res.ok) {
+          setMessage('adminLoginMensaje', res && res.mensaje ? res.mensaje : 'No se pudo ingresar.', true);
+          return;
+        }
+
+        window.portalAdminToken = res.token;
+        sessionStorage.setItem('portalAdminToken', res.token);
+        setMessage('adminLoginMensaje', '');
+        mostrarPanelAdmin();
+        mostrarAdminTab('clientes');
+        recargarAdminListas();
       })
       .withFailureHandler(function(error) {
-        setMessage('adminMensaje', error.message || String(error), true);
+        console.error('error loginAdmin', error);
+        setMessage('adminLoginMensaje', error.message || String(error), true);
       })
-      .instalarPortalClientesV1();
+      .loginAdmin(document.getElementById('adminPin').value);
+  }
+
+  function cerrarSesionAdmin() {
+    window.portalAdminToken = null;
+    sessionStorage.removeItem('portalAdminToken');
+    setMessage('adminMensaje', '');
+    setMessage('adminLoginMensaje', 'Sesion admin cerrada.');
+    mostrarLoginAdmin();
+  }
+
+  function obtenerAdminToken() {
+    return window.portalAdminToken || sessionStorage.getItem('portalAdminToken') || '';
+  }
+
+  function mostrarAdminTab(tab) {
+    Array.prototype.forEach.call(document.querySelectorAll('.admin-tab-panel'), function(panel) {
+      panel.classList.add('hidden');
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.admin-tab'), function(button) {
+      button.classList.toggle('active', button.dataset.adminTab === tab);
+    });
+
+    const target = document.getElementById('adminTab-' + tab);
+    if (target) target.classList.remove('hidden');
+  }
+
+  function recargarAdminListas() {
+    cargarClientesAdmin();
+    cargarPublicacionesAdmin();
+  }
+
+  function cargarClientesAdmin() {
+    const target = document.getElementById('adminClientesLista');
+    if (!target) return;
+    target.innerHTML = '<p class="muted">Cargando clientes...</p>';
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          target.innerHTML = '<p class="message error">' + esc(res && res.mensaje ? res.mensaje : 'No se pudieron cargar clientes.') + '</p>';
+          return;
+        }
+        const clientes = res.clientes || [];
+        target.innerHTML = clientes.length ? clientes.map(renderClienteAdmin).join('') : '<p class="muted">Sin clientes cargados.</p>';
+      })
+      .withFailureHandler(function(error) {
+        target.innerHTML = '<p class="message error">' + esc(error.message || String(error)) + '</p>';
+      })
+      .listarClientesPortalAdmin(obtenerAdminToken());
+  }
+
+  function cargarPublicacionesAdmin() {
+    const target = document.getElementById('adminPublicacionesLista');
+    if (!target) return;
+    target.innerHTML = '<p class="muted">Cargando publicaciones...</p>';
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          target.innerHTML = '<p class="message error">' + esc(res && res.mensaje ? res.mensaje : 'No se pudieron cargar publicaciones.') + '</p>';
+          return;
+        }
+        const publicaciones = res.publicaciones || [];
+        target.innerHTML = publicaciones.length ? publicaciones.map(renderPublicacionAdmin).join('') : '<p class="muted">Sin publicaciones cargadas.</p>';
+      })
+      .withFailureHandler(function(error) {
+        target.innerHTML = '<p class="message error">' + esc(error.message || String(error)) + '</p>';
+      })
+      .listarPublicacionesPortalAdmin(obtenerAdminToken());
+  }
+
+  function renderClienteAdmin(item) {
+    return '<article class="item"><strong>' + esc(item.idPortalCliente || 'Sin ID') + '</strong><small>' +
+      esc(item.razonSocial || item.nombreFantasia || '') + '</small><p>' + esc(item.cuit || '') +
+      ' - ' + esc(item.emailPrincipal || '') + '</p><small>Activo: ' + esc(item.activo || '') + '</small></article>';
+  }
+
+  function renderPublicacionAdmin(item) {
+    return '<article class="item"><strong>' + esc(item.idPublicacion || 'Sin ID') + '</strong><small>' +
+      esc(item.titulo || '') + '</small><p>ID cliente: ' + esc(item.idPortalCliente || '') +
+      '</p><small>Visible: ' + esc(item.visible || '') + ' - ' + esc(item.fechaCarga || '') + '</small></article>';
+  }
+
+  function crearClientePortalUi(event) {
+    enviarAdminForm(event, 'crearClientePortalAdmin', 'Cliente creado.');
+  }
+
+  function crearUsuarioPortalUi(event) {
+    enviarAdminForm(event, 'crearUsuarioPortalAdmin', 'Usuario creado.');
   }
 
   function crearPublicacionUi(event) {
@@ -244,6 +370,13 @@
   function enviarAdminForm(event, fn, okMessage) {
     event.preventDefault();
     const form = event.target;
+    const token = obtenerAdminToken();
+    if (!token) {
+      setMessage('adminMensaje', 'Primero ingresa con PIN admin.', true);
+      mostrarLoginAdmin();
+      return;
+    }
+
     setMessage('adminMensaje', 'Guardando...');
     google.script.run
       .withSuccessHandler(function(res) {
@@ -253,10 +386,11 @@
         }
         form.reset();
         setMessage('adminMensaje', okMessage + ' ID: ' + res.id);
+        recargarAdminListas();
       })
       .withFailureHandler(function(error) {
         setMessage('adminMensaje', error.message || String(error), true);
-      })[fn](formToObject(form));
+      })[fn](formToObject(form), token);
   }
 
   function esc(value) {

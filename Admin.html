@@ -6,63 +6,279 @@
   </head>
   <body>
     <header class="topbar">
-      <div>
-        <span class="eyebrow">FUMTEX</span>
-        <h1>Admin Portal Clientes</h1>
+      <div class="brand-lockup">
+        <div class="brand-logo" aria-label="FUMTEX Servicios Integrales">
+          <span class="brand-mark">F</span>
+          <div class="brand-text">
+            <span class="brand-name">FUMTEX</span>
+            <span class="brand-subtitle">Servicios Integrales</span>
+          </div>
+        </div>
+        <div class="page-heading">
+          <span class="eyebrow">Portal Clientes</span>
+          <h1>Admin interno</h1>
+        </div>
       </div>
-      <button type="button" onclick="instalarPortal()">Instalar/verificar hojas</button>
+      <button class="secondary-button" type="button" onclick="cerrarSesionAdmin()">Cerrar sesi&oacute;n</button>
     </header>
 
-    <main class="layout">
-      <section class="grid-3">
-        <form class="panel" onsubmit="crearPublicacionUi(event)">
-          <h2>Nueva visita/publicacion</h2>
-          <input name="idPortalCliente" placeholder="ID_PORTAL_CLIENTE" required>
-          <input name="idVisitaOrigen" placeholder="ID visita origen">
-          <input name="fechaVisita" type="date">
-          <input name="sucursal" placeholder="Sucursal">
-          <input name="tipoServicio" placeholder="Tipo de servicio">
-          <input name="titulo" placeholder="Titulo" required>
-          <input name="categoria" placeholder="Categoria">
-          <input name="estadoPublicacion" placeholder="Estado publicacion" value="PUBLICADO">
-          <textarea name="resumenCliente" placeholder="Resumen para cliente"></textarea>
-          <textarea name="contenido" placeholder="Contenido" required></textarea>
-          <label class="check"><input name="visible" type="checkbox" checked> Visible</label>
-          <button type="submit">Publicar</button>
+    <main class="layout admin-layout">
+      <section id="adminLoginPanel" class="panel login-panel">
+        <div class="brand-logo login-logo" aria-label="FUMTEX Servicios Integrales">
+          <span class="brand-mark">F</span>
+          <div class="brand-text">
+            <span class="brand-name">FUMTEX</span>
+            <span class="brand-subtitle">Servicios Integrales</span>
+          </div>
+        </div>
+        <h2>Ingreso admin</h2>
+        <p class="muted">Acceso interno para cargar clientes, usuarios y publicaciones del portal.</p>
+        <form onsubmit="loginAdminUi(event)">
+          <label>PIN interno
+            <input id="adminPin" type="password" autocomplete="current-password" required>
+          </label>
+          <button type="submit">Ingresar</button>
         </form>
-
-        <form class="panel" onsubmit="crearMonitoreoUi(event)">
-          <h2>Nuevo monitoreo</h2>
-          <input name="idPublicacion" placeholder="ID_PUBLICACION relacionado">
-          <input name="idPortalCliente" placeholder="ID_PORTAL_CLIENTE" required>
-          <input name="fecha" type="date" required>
-          <input name="sector" placeholder="Sector">
-          <input name="puntoControl" placeholder="Punto de control">
-          <input name="tipo" placeholder="Tipo">
-          <textarea name="resultado" placeholder="Resultado" required></textarea>
-          <textarea name="novedad" placeholder="Novedad"></textarea>
-          <textarea name="accionCorrectiva" placeholder="Accion correctiva"></textarea>
-          <textarea name="observaciones" placeholder="Observaciones"></textarea>
-          <label class="check"><input name="visible" type="checkbox" checked> Visible</label>
-          <button type="submit">Guardar monitoreo</button>
-        </form>
-
-        <form class="panel" onsubmit="crearDocumentoUi(event)">
-          <h2>Nuevo documento</h2>
-          <input name="idPublicacion" placeholder="ID_PUBLICACION relacionado">
-          <input name="idPortalCliente" placeholder="ID_PORTAL_CLIENTE" required>
-          <input name="titulo" placeholder="Titulo" required>
-          <input name="tipo" placeholder="Tipo">
-          <input name="url" placeholder="URL del documento" required>
-          <input name="carpetaDriveId" placeholder="ID carpeta Drive">
-          <textarea name="descripcion" placeholder="Descripcion"></textarea>
-          <label class="check"><input name="visible" type="checkbox" checked> Visible</label>
-          <button type="submit">Guardar documento</button>
-        </form>
+        <p id="adminLoginMensaje" class="message"></p>
       </section>
 
-      <p id="adminMensaje" class="message"></p>
+      <section id="adminAppPanel" class="hidden">
+        <section class="panel admin-welcome">
+          <div>
+            <span class="eyebrow">Carga interna</span>
+            <h2>Panel Admin Portal Clientes</h2>
+            <p class="muted">Todo lo que se guarde desde este panel escribe solo en hojas con prefijo PORTAL_.</p>
+          </div>
+          <button class="secondary-button" type="button" onclick="recargarAdminListas()">Actualizar listas</button>
+        </section>
+
+        <nav class="admin-tabs" aria-label="Secciones admin">
+          <button type="button" class="admin-tab active" data-admin-tab="clientes" onclick="mostrarAdminTab('clientes')">Clientes</button>
+          <button type="button" class="admin-tab" data-admin-tab="usuarios" onclick="mostrarAdminTab('usuarios')">Usuarios</button>
+          <button type="button" class="admin-tab" data-admin-tab="publicaciones" onclick="mostrarAdminTab('publicaciones')">Visitas/Publicaciones</button>
+          <button type="button" class="admin-tab" data-admin-tab="monitoreos" onclick="mostrarAdminTab('monitoreos')">Monitoreos</button>
+          <button type="button" class="admin-tab" data-admin-tab="documentos" onclick="mostrarAdminTab('documentos')">Documentos</button>
+        </nav>
+
+        <p id="adminMensaje" class="message"></p>
+
+        <section id="adminTab-clientes" class="admin-tab-panel">
+          <form class="panel admin-form" onsubmit="crearClientePortalUi(event)">
+            <h2>Nuevo cliente del portal</h2>
+            <div class="form-grid">
+              <label>ID cliente origen
+                <input name="idClienteOrigen" placeholder="ID de Clientes/AppSheet si existe">
+              </label>
+              <label>CUIT
+                <input name="cuit" required>
+              </label>
+              <label>Razon social
+                <input name="razonSocial" required>
+              </label>
+              <label>Nombre fantasia
+                <input name="nombreFantasia">
+              </label>
+              <label>Email principal
+                <input name="emailPrincipal" type="email">
+              </label>
+              <label>Telefono
+                <input name="telefono">
+              </label>
+              <label>Direccion
+                <input name="direccion">
+              </label>
+              <label>Carpeta Drive ID
+                <input name="carpetaDriveId">
+              </label>
+              <label>Activo
+                <select name="activo">
+                  <option value="SI">SI</option>
+                  <option value="NO">NO</option>
+                </select>
+              </label>
+            </div>
+            <label>Observaciones
+              <textarea name="observaciones"></textarea>
+            </label>
+            <button type="submit">Guardar cliente</button>
+          </form>
+
+          <section class="panel">
+            <h3>Clientes cargados</h3>
+            <div id="adminClientesLista" class="list">
+              <p class="muted">Ingres&aacute; con PIN para ver clientes.</p>
+            </div>
+          </section>
+        </section>
+
+        <section id="adminTab-usuarios" class="admin-tab-panel hidden">
+          <form class="panel admin-form" onsubmit="crearUsuarioPortalUi(event)">
+            <h2>Nuevo usuario autorizado</h2>
+            <div class="form-grid">
+              <label>ID portal cliente
+                <input name="idPortalCliente" required>
+              </label>
+              <label>CUIT
+                <input name="cuit" required>
+              </label>
+              <label>Email
+                <input name="email" type="email" required>
+              </label>
+              <label>Nombre
+                <input name="nombre">
+              </label>
+              <label>Rol
+                <input name="rol" value="CLIENTE">
+              </label>
+              <label>Activo
+                <select name="activo">
+                  <option value="SI">SI</option>
+                  <option value="NO">NO</option>
+                </select>
+              </label>
+              <label>Clave temporal
+                <input name="claveTemporal" type="password" autocomplete="new-password" required>
+              </label>
+            </div>
+            <button type="submit">Guardar usuario</button>
+          </form>
+        </section>
+
+        <section id="adminTab-publicaciones" class="admin-tab-panel hidden">
+          <form class="panel admin-form" onsubmit="crearPublicacionUi(event)">
+            <h2>Nueva visita/publicacion</h2>
+            <div class="form-grid">
+              <label>ID portal cliente
+                <input name="idPortalCliente" required>
+              </label>
+              <label>ID visita origen
+                <input name="idVisitaOrigen">
+              </label>
+              <label>Fecha visita
+                <input name="fechaVisita" type="date">
+              </label>
+              <label>Sucursal
+                <input name="sucursal">
+              </label>
+              <label>Tipo servicio
+                <input name="tipoServicio">
+              </label>
+              <label>Titulo
+                <input name="titulo" required>
+              </label>
+              <label>Categoria
+                <input name="categoria">
+              </label>
+              <label>Estado publicacion
+                <input name="estadoPublicacion" value="PUBLICADO">
+              </label>
+              <label>Visible
+                <select name="visible">
+                  <option value="SI">SI</option>
+                  <option value="NO">NO</option>
+                </select>
+              </label>
+            </div>
+            <label>Resumen cliente
+              <textarea name="resumenCliente"></textarea>
+            </label>
+            <label>Contenido
+              <textarea name="contenido" required></textarea>
+            </label>
+            <button type="submit">Guardar publicacion</button>
+          </form>
+
+          <section class="panel">
+            <h3>Publicaciones cargadas</h3>
+            <div id="adminPublicacionesLista" class="list">
+              <p class="muted">Ingres&aacute; con PIN para ver publicaciones.</p>
+            </div>
+          </section>
+        </section>
+
+        <section id="adminTab-monitoreos" class="admin-tab-panel hidden">
+          <form class="panel admin-form" onsubmit="crearMonitoreoUi(event)">
+            <h2>Nuevo monitoreo</h2>
+            <div class="form-grid">
+              <label>ID publicacion
+                <input name="idPublicacion">
+              </label>
+              <label>ID portal cliente
+                <input name="idPortalCliente" required>
+              </label>
+              <label>Fecha
+                <input name="fecha" type="date" required>
+              </label>
+              <label>Sector
+                <input name="sector">
+              </label>
+              <label>Punto control
+                <input name="puntoControl">
+              </label>
+              <label>Tipo
+                <input name="tipo">
+              </label>
+              <label>Visible
+                <select name="visible">
+                  <option value="SI">SI</option>
+                  <option value="NO">NO</option>
+                </select>
+              </label>
+            </div>
+            <label>Resultado
+              <textarea name="resultado" required></textarea>
+            </label>
+            <label>Novedad
+              <textarea name="novedad"></textarea>
+            </label>
+            <label>Accion correctiva
+              <textarea name="accionCorrectiva"></textarea>
+            </label>
+            <label>Observaciones
+              <textarea name="observaciones"></textarea>
+            </label>
+            <button type="submit">Guardar monitoreo</button>
+          </form>
+        </section>
+
+        <section id="adminTab-documentos" class="admin-tab-panel hidden">
+          <form class="panel admin-form" onsubmit="crearDocumentoUi(event)">
+            <h2>Nuevo documento</h2>
+            <div class="form-grid">
+              <label>ID portal cliente
+                <input name="idPortalCliente" required>
+              </label>
+              <label>ID publicacion
+                <input name="idPublicacion">
+              </label>
+              <label>Titulo
+                <input name="titulo" required>
+              </label>
+              <label>Tipo
+                <input name="tipo">
+              </label>
+              <label>URL
+                <input name="url" required>
+              </label>
+              <label>Carpeta Drive ID
+                <input name="carpetaDriveId">
+              </label>
+              <label>Visible
+                <select name="visible">
+                  <option value="SI">SI</option>
+                  <option value="NO">NO</option>
+                </select>
+              </label>
+            </div>
+            <label>Descripcion
+              <textarea name="descripcion"></textarea>
+            </label>
+            <button type="submit">Guardar documento</button>
+          </form>
+        </section>
+      </section>
     </main>
     <?!= include('Scripts'); ?>
+    <script>inicializarPantallaAdmin();</script>
   </body>
 </html>

@@ -1,10 +1,97 @@
-function crearPublicacionAdmin(data) {
-  validarAdminPortal_();
+function loginAdmin(pin) {
+  const pinIngresado = normalizarTexto_(pin);
+  const pinConfigurado = PropertiesService.getScriptProperties().getProperty('PORTAL_ADMIN_PIN');
+
+  if (!pinConfigurado) {
+    return { ok: false, mensaje: 'No existe PORTAL_ADMIN_PIN en Script Properties.' };
+  }
+
+  if (!pinIngresado || pinIngresado !== String(pinConfigurado)) {
+    registrarLog('', '', 'LOGIN_ADMIN', 'ERROR', 'PIN invalido');
+    return { ok: false, mensaje: 'PIN admin invalido.' };
+  }
+
+  const token = Utilities.getUuid();
+  const payload = JSON.stringify({
+    usuario: 'ADMIN_PORTAL',
+    fecha: new Date().toISOString()
+  });
+
+  CacheService.getScriptCache().put('ADMIN_' + token, payload, PORTAL_CONFIG.SESSION_TTL_SECONDS);
+  registrarLog('', '', 'LOGIN_ADMIN', 'OK', 'Acceso admin correcto');
+
+  return {
+    ok: true,
+    token: token,
+    usuario: 'ADMIN_PORTAL',
+    mensaje: 'Acceso admin correcto.'
+  };
+}
+
+function validarAdminToken_(token) {
+  const tokenLimpio = normalizarTexto_(token);
+  if (!tokenLimpio) throw new Error('Falta token admin.');
+
+  const raw = CacheService.getScriptCache().get('ADMIN_' + tokenLimpio);
+  if (!raw) throw new Error('Sesion admin vencida o invalida. Volve a ingresar.');
+
+  return 'ADMIN_PORTAL';
+}
+
+function crearClientePortalAdmin(data, adminToken) {
+  const usuario = validarAdminToken_(adminToken);
+  validarDataAdmin_(data, ['cuit', 'razonSocial']);
+
+  const row = {
+    ID_PORTAL_CLIENTE: normalizarTexto_(data.idPortalCliente) || generarId_('CLI'),
+    ID_CLIENTE_ORIGEN: normalizarTexto_(data.idClienteOrigen),
+    CUIT: normalizarTexto_(data.cuit),
+    RAZON_SOCIAL: normalizarTexto_(data.razonSocial),
+    NOMBRE_FANTASIA: normalizarTexto_(data.nombreFantasia),
+    EMAIL_PRINCIPAL: normalizarClave_(data.emailPrincipal),
+    TELEFONO: normalizarTexto_(data.telefono),
+    DIRECCION: normalizarTexto_(data.direccion),
+    CARPETA_DRIVE_ID: normalizarTexto_(data.carpetaDriveId),
+    ACTIVO: normalizarSiNo_(data.activo),
+    FECHA_ALTA: new Date(),
+    OBSERVACIONES: normalizarTexto_(data.observaciones)
+  };
+
+  appendPortalRow_(PORTAL_CONFIG.HOJAS.CLIENTES, row);
+  registrarLog('', row.ID_PORTAL_CLIENTE, 'CREAR_CLIENTE_PORTAL', 'OK', usuario + ' - ' + row.ID_PORTAL_CLIENTE);
+  return { ok: true, id: row.ID_PORTAL_CLIENTE, mensaje: 'Cliente portal creado.' };
+}
+
+function crearUsuarioPortalAdmin(data, adminToken) {
+  const usuario = validarAdminToken_(adminToken);
+  validarDataAdmin_(data, ['idPortalCliente', 'cuit', 'email', 'claveTemporal']);
+  const cliente = obtenerClientePortalActivoPorId_(data.idPortalCliente);
+  const claveTemporal = normalizarTexto_(data.claveTemporal);
+
+  const row = {
+    ID_USUARIO: normalizarTexto_(data.idUsuario) || generarId_('USR'),
+    ID_PORTAL_CLIENTE: normalizarTexto_(cliente.ID_PORTAL_CLIENTE),
+    CUIT: normalizarTexto_(data.cuit),
+    EMAIL: normalizarClave_(data.email),
+    CLAVE_HASH: hashClave_(claveTemporal),
+    NOMBRE: normalizarTexto_(data.nombre),
+    ROL: normalizarTexto_(data.rol) || 'CLIENTE',
+    ACTIVO: normalizarSiNo_(data.activo),
+    FECHA_ALTA: new Date(),
+    ULTIMO_ACCESO: ''
+  };
+
+  appendPortalRow_(PORTAL_CONFIG.HOJAS.USUARIOS, row);
+  registrarLog('', row.ID_PORTAL_CLIENTE, 'CREAR_USUARIO_PORTAL', 'OK', usuario + ' - ' + row.ID_USUARIO);
+  return { ok: true, id: row.ID_USUARIO, mensaje: 'Usuario portal creado.' };
+}
+
+function crearPublicacionAdmin(data, adminToken) {
+  const usuario = validarAdminToken_(adminToken);
   validarDataAdmin_(data, ['idPortalCliente', 'titulo', 'contenido']);
   const cliente = obtenerClientePortalActivoPorId_(data.idPortalCliente);
-  const usuario = Session.getActiveUser().getEmail();
   const row = {
-    ID_PUBLICACION: generarId_('PUB'),
+    ID_PUBLICACION: normalizarTexto_(data.idPublicacion) || generarId_('PUB'),
     ID_PORTAL_CLIENTE: normalizarTexto_(cliente.ID_PORTAL_CLIENTE),
     ID_VISITA_ORIGEN: normalizarTexto_(data.idVisitaOrigen),
     FECHA_VISITA: data.fechaVisita ? new Date(data.fechaVisita) : '',
@@ -15,24 +102,23 @@ function crearPublicacionAdmin(data) {
     ESTADO_PUBLICACION: normalizarTexto_(data.estadoPublicacion) || 'PUBLICADO',
     RESUMEN_CLIENTE: normalizarTexto_(data.resumenCliente),
     CONTENIDO: normalizarTexto_(data.contenido),
-    VISIBLE: data.visible === false ? 'NO' : 'SI',
+    VISIBLE: normalizarSiNo_(data.visible),
     FECHA_CARGA: new Date(),
     FECHA_PUBLICACION: data.fechaPublicacion ? new Date(data.fechaPublicacion) : new Date(),
     USUARIO_CARGA: usuario
   };
 
   appendPortalRow_(PORTAL_CONFIG.HOJAS.PUBLICACIONES, row);
-  registrarLog(usuario, row.ID_PORTAL_CLIENTE, 'CREAR_PUBLICACION', 'OK', row.ID_PUBLICACION);
+  registrarLog('', row.ID_PORTAL_CLIENTE, 'CREAR_PUBLICACION', 'OK', usuario + ' - ' + row.ID_PUBLICACION);
   return { ok: true, id: row.ID_PUBLICACION, mensaje: 'Publicacion creada.' };
 }
 
-function crearMonitoreoAdmin(data) {
-  validarAdminPortal_();
+function crearMonitoreoAdmin(data, adminToken) {
+  const usuario = validarAdminToken_(adminToken);
   validarDataAdmin_(data, ['idPortalCliente', 'fecha', 'resultado']);
   const cliente = obtenerClientePortalActivoPorId_(data.idPortalCliente);
-  const usuario = Session.getActiveUser().getEmail();
   const row = {
-    ID_MONITOREO: generarId_('MON'),
+    ID_MONITOREO: normalizarTexto_(data.idMonitoreo) || generarId_('MON'),
     ID_PUBLICACION: normalizarTexto_(data.idPublicacion),
     ID_PORTAL_CLIENTE: normalizarTexto_(cliente.ID_PORTAL_CLIENTE),
     FECHA: data.fecha ? new Date(data.fecha) : new Date(),
@@ -43,23 +129,22 @@ function crearMonitoreoAdmin(data) {
     NOVEDAD: normalizarTexto_(data.novedad),
     ACCION_CORRECTIVA: normalizarTexto_(data.accionCorrectiva),
     OBSERVACIONES: normalizarTexto_(data.observaciones),
-    VISIBLE: data.visible === false ? 'NO' : 'SI',
+    VISIBLE: normalizarSiNo_(data.visible),
     FECHA_CARGA: new Date(),
     USUARIO_CARGA: usuario
   };
 
   appendPortalRow_(PORTAL_CONFIG.HOJAS.MONITOREOS, row);
-  registrarLog(usuario, row.ID_PORTAL_CLIENTE, 'CREAR_MONITOREO', 'OK', row.ID_MONITOREO);
+  registrarLog('', row.ID_PORTAL_CLIENTE, 'CREAR_MONITOREO', 'OK', usuario + ' - ' + row.ID_MONITOREO);
   return { ok: true, id: row.ID_MONITOREO, mensaje: 'Monitoreo creado.' };
 }
 
-function crearDocumentoAdmin(data) {
-  validarAdminPortal_();
+function crearDocumentoAdmin(data, adminToken) {
+  const usuario = validarAdminToken_(adminToken);
   validarDataAdmin_(data, ['idPortalCliente', 'titulo', 'url']);
   const cliente = obtenerClientePortalActivoPorId_(data.idPortalCliente);
-  const usuario = Session.getActiveUser().getEmail();
   const row = {
-    ID_DOCUMENTO: generarId_('DOC'),
+    ID_DOCUMENTO: normalizarTexto_(data.idDocumento) || generarId_('DOC'),
     ID_PORTAL_CLIENTE: normalizarTexto_(cliente.ID_PORTAL_CLIENTE),
     ID_PUBLICACION: normalizarTexto_(data.idPublicacion),
     TITULO: normalizarTexto_(data.titulo),
@@ -67,14 +152,46 @@ function crearDocumentoAdmin(data) {
     URL: normalizarTexto_(data.url),
     CARPETA_DRIVE_ID: normalizarTexto_(data.carpetaDriveId),
     DESCRIPCION: normalizarTexto_(data.descripcion),
-    VISIBLE: data.visible === false ? 'NO' : 'SI',
+    VISIBLE: normalizarSiNo_(data.visible),
     FECHA_CARGA: new Date(),
     USUARIO_CARGA: usuario
   };
 
   appendPortalRow_(PORTAL_CONFIG.HOJAS.DOCUMENTOS, row);
-  registrarLog(usuario, row.ID_PORTAL_CLIENTE, 'CREAR_DOCUMENTO', 'OK', row.ID_DOCUMENTO);
+  registrarLog('', row.ID_PORTAL_CLIENTE, 'CREAR_DOCUMENTO', 'OK', usuario + ' - ' + row.ID_DOCUMENTO);
   return { ok: true, id: row.ID_DOCUMENTO, mensaje: 'Documento creado.' };
+}
+
+function listarClientesPortalAdmin(adminToken) {
+  validarAdminToken_(adminToken);
+  const hoja = obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.CLIENTES);
+  const clientes = leerFilasPorHeaders_(hoja).map(function(row) {
+    return {
+      idPortalCliente: normalizarTexto_(row.ID_PORTAL_CLIENTE),
+      razonSocial: normalizarTexto_(row.RAZON_SOCIAL),
+      nombreFantasia: normalizarTexto_(row.NOMBRE_FANTASIA),
+      cuit: normalizarTexto_(row.CUIT),
+      emailPrincipal: normalizarTexto_(row.EMAIL_PRINCIPAL),
+      activo: normalizarTexto_(row.ACTIVO)
+    };
+  });
+  return { ok: true, clientes: clientes };
+}
+
+function listarPublicacionesPortalAdmin(adminToken) {
+  validarAdminToken_(adminToken);
+  const hoja = obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.PUBLICACIONES);
+  const publicaciones = leerFilasPorHeaders_(hoja).map(function(row) {
+    return {
+      idPublicacion: normalizarTexto_(row.ID_PUBLICACION),
+      idPortalCliente: normalizarTexto_(row.ID_PORTAL_CLIENTE),
+      titulo: normalizarTexto_(row.TITULO),
+      categoria: normalizarTexto_(row.CATEGORIA),
+      visible: normalizarTexto_(row.VISIBLE),
+      fechaCarga: formatearFecha_(row.FECHA_CARGA)
+    };
+  });
+  return { ok: true, publicaciones: publicaciones };
 }
 
 function validarDataAdmin_(data, campos) {
@@ -113,4 +230,11 @@ function validarAdminPortal_() {
     throw new Error('No tenes permiso para administrar el portal.');
   }
   return email;
+}
+
+function normalizarSiNo_(valor) {
+  if (valor === false) return 'NO';
+  const texto = normalizarTexto_(valor).toUpperCase();
+  if (texto === 'NO' || texto === 'INACTIVO') return 'NO';
+  return 'SI';
 }

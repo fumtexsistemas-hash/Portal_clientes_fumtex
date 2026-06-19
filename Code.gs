@@ -15,8 +15,8 @@ function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
-function instalarPortalClientesV1() {
-  validarAdminPortal_();
+function instalarPortalClientesV1(adminToken) {
+  const usuario = validarAdminToken_(adminToken);
   const ss = abrirPortalSS_();
   Object.keys(PORTAL_CONFIG.HOJAS).forEach(function(key) {
     const nombreHoja = PORTAL_CONFIG.HOJAS[key];
@@ -24,7 +24,7 @@ function instalarPortalClientesV1() {
     crearHojaPortalSiNoExiste_(ss, nombreHoja, headers);
   });
 
-  registrarLog('', '', 'INSTALAR_PORTAL_CLIENTES_V1', 'OK', 'Instalacion/verificacion de hojas PORTAL_');
+  registrarLog('', '', 'INSTALAR_PORTAL_CLIENTES_V1', 'OK', usuario + ' - Instalacion/verificacion de hojas PORTAL_');
   return {
     ok: true,
     mensaje: 'Portal Clientes v1.0 instalado. Solo se crearon/verificaron hojas PORTAL_.',
