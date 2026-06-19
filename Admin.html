@@ -60,6 +60,7 @@
           <button type="button" class="admin-tab" data-admin-tab="documentos" onclick="mostrarAdminTab('documentos')">Documentos</button>
           <button type="button" class="admin-tab" data-admin-tab="vistaCliente" onclick="mostrarAdminTab('vistaCliente')">Vista cliente</button>
           <button type="button" class="admin-tab" data-admin-tab="visibilidad" onclick="mostrarAdminTab('visibilidad')">Gestionar visibilidad</button>
+          <button type="button" class="admin-tab" data-admin-tab="editarRegistros" onclick="mostrarAdminTab('editarRegistros')">Editar registros</button>
         </nav>
 
         <p id="adminMensaje" class="message"></p>
@@ -331,6 +332,28 @@
             <article class="panel">
               <h3>Registros del cliente</h3>
               <p class="muted">Seleccion&aacute; un cliente para gestionar visibilidad.</p>
+            </article>
+          </section>
+        </section>
+
+        <section id="adminTab-editarRegistros" class="admin-tab-panel hidden">
+          <section class="panel admin-form">
+            <h2>Editar registros</h2>
+            <p class="muted">Edit&aacute; publicaciones y documentos del cliente sin modificar IDs ni borrar registros.</p>
+            <div class="form-grid">
+              <label>Cliente
+                <select id="selectClienteEdicion" onchange="limpiarEdicionRegistrosAdmin()">
+                  <option value="">Cargando clientes...</option>
+                </select>
+              </label>
+            </div>
+            <button type="button" onclick="cargarEdicionRegistrosAdmin()">Cargar registros editables</button>
+          </section>
+
+          <section id="edicionRegistrosResultado" class="admin-preview-grid">
+            <article class="panel">
+              <h3>Registros editables</h3>
+              <p class="muted">Seleccion&aacute; un cliente para editar publicaciones y documentos.</p>
             </article>
           </section>
         </section>

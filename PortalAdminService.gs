@@ -303,9 +303,16 @@ function obtenerGestionClienteAdmin(idPortalCliente, adminToken) {
       return {
         id: normalizarTexto_(row.ID_PUBLICACION),
         fecha: formatearFecha_(row.FECHA_VISITA),
+        fechaVisita: formatearFechaSimple_(row.FECHA_VISITA),
         titulo: normalizarTexto_(row.TITULO),
         detalle: [normalizarTexto_(row.TIPO_SERVICIO), normalizarTexto_(row.SUCURSAL)].filter(Boolean).join(' - '),
+        sucursal: normalizarTexto_(row.SUCURSAL),
+        tipoServicio: normalizarTexto_(row.TIPO_SERVICIO),
+        categoria: normalizarTexto_(row.CATEGORIA),
+        estadoPublicacion: normalizarTexto_(row.ESTADO_PUBLICACION),
         resumen: normalizarTexto_(row.RESUMEN_CLIENTE),
+        resumenCliente: normalizarTexto_(row.RESUMEN_CLIENTE),
+        contenido: normalizarTexto_(row.CONTENIDO),
         visible: normalizarTexto_(row.VISIBLE) || 'NO'
       };
     }),
@@ -327,10 +334,53 @@ function obtenerGestionClienteAdmin(idPortalCliente, adminToken) {
         detalle: normalizarTexto_(row.TIPO),
         resumen: normalizarTexto_(row.DESCRIPCION),
         url: normalizarTexto_(row.URL),
+        carpetaDriveId: normalizarTexto_(row.CARPETA_DRIVE_ID),
+        descripcion: normalizarTexto_(row.DESCRIPCION),
         visible: normalizarTexto_(row.VISIBLE) || 'NO'
       };
     })
   };
+}
+
+function actualizarPublicacionAdmin(idPublicacion, data, adminToken) {
+  validarAdminToken_(adminToken);
+  return actualizarRegistroPortalPorId_(
+    PORTAL_CONFIG.HOJAS.PUBLICACIONES,
+    'ID_PUBLICACION',
+    idPublicacion,
+    data,
+    {
+      FECHA_VISITA: 'fechaVisita',
+      SUCURSAL: 'sucursal',
+      TIPO_SERVICIO: 'tipoServicio',
+      TITULO: 'titulo',
+      CATEGORIA: 'categoria',
+      ESTADO_PUBLICACION: 'estadoPublicacion',
+      RESUMEN_CLIENTE: 'resumenCliente',
+      CONTENIDO: 'contenido',
+      VISIBLE: 'visible'
+    },
+    'ACTUALIZAR_PUBLICACION'
+  );
+}
+
+function actualizarDocumentoAdmin(idDocumento, data, adminToken) {
+  validarAdminToken_(adminToken);
+  return actualizarRegistroPortalPorId_(
+    PORTAL_CONFIG.HOJAS.DOCUMENTOS,
+    'ID_DOCUMENTO',
+    idDocumento,
+    data,
+    {
+      TITULO: 'titulo',
+      TIPO: 'tipo',
+      URL: 'url',
+      CARPETA_DRIVE_ID: 'carpetaDriveId',
+      DESCRIPCION: 'descripcion',
+      VISIBLE: 'visible'
+    },
+    'ACTUALIZAR_DOCUMENTO'
+  );
 }
 
 function cambiarVisiblePublicacionAdmin(idPublicacion, visible, adminToken) {
@@ -453,6 +503,78 @@ function cambiarVisibleRegistroPortal_(nombreHoja, idHeader, idRegistro, visible
   }
 
   throw new Error('No se encontro el registro ' + id + ' en ' + nombreHoja + '.');
+}
+
+function actualizarRegistroPortalPorId_(nombreHoja, idHeader, idRegistro, data, columnasPermitidas, accion) {
+  const id = normalizarTexto_(idRegistro);
+  if (!id) throw new Error('Falta ID del registro.');
+  if (!data) throw new Error('No se recibieron datos para actualizar.');
+
+  const hoja = obtenerHojaPortal_(nombreHoja);
+  const lastCol = hoja.getLastColumn();
+  const headers = hoja.getRange(1, 1, 1, lastCol).getValues()[0].map(function(header) {
+    return normalizarTexto_(header);
+  });
+  const idCol = headers.indexOf(idHeader) + 1;
+  const idClienteCol = headers.indexOf('ID_PORTAL_CLIENTE') + 1;
+  if (!idCol) throw new Error('No se encontro la columna ' + idHeader + ' en ' + nombreHoja + '.');
+
+  const cambios = [];
+  Object.keys(columnasPermitidas).forEach(function(header) {
+    const dataKey = columnasPermitidas[header];
+    if (!Object.prototype.hasOwnProperty.call(data, dataKey)) return;
+
+    const col = headers.indexOf(header) + 1;
+    if (!col) return;
+
+    let valor = data[dataKey];
+    if (header === 'VISIBLE') {
+      valor = normalizarTexto_(valor).toUpperCase();
+      if (valor !== 'SI' && valor !== 'NO') {
+        throw new Error('VISIBLE debe ser SI o NO.');
+      }
+    } else if (header === 'FECHA_VISITA') {
+      valor = valor ? new Date(valor) : '';
+    } else {
+      valor = normalizarTexto_(valor);
+    }
+
+    cambios.push({ header: header, col: col, valor: valor });
+  });
+
+  if (!cambios.length) throw new Error('No hay campos permitidos para actualizar.');
+
+  const lastRow = hoja.getLastRow();
+  if (lastRow < 2) throw new Error('No hay registros en ' + nombreHoja + '.');
+
+  const values = hoja.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  for (let index = 0; index < values.length; index++) {
+    if (normalizarTexto_(values[index][idCol - 1]) === id) {
+      const rowNumber = index + 2;
+      cambios.forEach(function(cambio) {
+        hoja.getRange(rowNumber, cambio.col).setValue(cambio.valor);
+      });
+      const idPortalCliente = idClienteCol ? normalizarTexto_(values[index][idClienteCol - 1]) : '';
+      registrarLog('', idPortalCliente, accion, 'OK', id + ' - campos: ' + cambios.map(function(cambio) {
+        return cambio.header;
+      }).join(', '));
+      return {
+        ok: true,
+        id: id,
+        mensaje: 'Registro actualizado correctamente.'
+      };
+    }
+  }
+
+  throw new Error('No se encontro el registro ' + id + ' en ' + nombreHoja + '.');
+}
+
+function formatearFechaSimple_(valor) {
+  if (!valor) return '';
+  if (Object.prototype.toString.call(valor) === '[object Date]') {
+    return Utilities.formatDate(valor, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  return String(valor);
 }
 
 function validarAdminPortal_() {

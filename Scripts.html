@@ -10,6 +10,7 @@
 
   window.portalAdminClientes = window.portalAdminClientes || [];
   window.portalAdminPublicaciones = window.portalAdminPublicaciones || [];
+  window.portalAdminEdicion = window.portalAdminEdicion || { publicaciones: [], documentos: [] };
 
   function setMessage(id, text, isError) {
     const el = document.getElementById(id);
@@ -356,7 +357,7 @@
 
   function actualizarSelectsClientesAdmin() {
     const clientes = window.portalAdminClientes || [];
-    const ids = ['selectClienteUsuario', 'selectClientePublicacion', 'selectClienteMonitoreo', 'selectClienteDocumento', 'selectClienteVista', 'selectClienteVisibilidad'];
+    const ids = ['selectClienteUsuario', 'selectClientePublicacion', 'selectClienteMonitoreo', 'selectClienteDocumento', 'selectClienteVista', 'selectClienteVisibilidad', 'selectClienteEdicion'];
     ids.forEach(function(id) {
       const select = document.getElementById(id);
       if (!select) return;
@@ -603,6 +604,185 @@
       .withFailureHandler(function(error) {
         setMessage('adminMensaje', error.message || String(error), true);
       })[fn](id, visible, token);
+  }
+
+  function limpiarEdicionRegistrosAdmin() {
+    window.portalAdminEdicion = { publicaciones: [], documentos: [] };
+    const target = document.getElementById('edicionRegistrosResultado');
+    if (!target) return;
+    target.innerHTML = '<article class="panel"><h3>Registros editables</h3><p class="muted">Toc&aacute; "Cargar registros editables" para empezar.</p></article>';
+  }
+
+  function cargarEdicionRegistrosAdmin() {
+    const select = document.getElementById('selectClienteEdicion');
+    const target = document.getElementById('edicionRegistrosResultado');
+    const token = obtenerAdminToken();
+    if (!select || !target) return;
+
+    if (!token) {
+      setMessage('adminMensaje', 'Primero ingresa con PIN admin.', true);
+      mostrarLoginAdmin();
+      return;
+    }
+
+    if (!select.value) {
+      target.innerHTML = '<article class="panel"><h3>Registros editables</h3><p class="message error">Seleccion&aacute; un cliente.</p></article>';
+      return;
+    }
+
+    target.innerHTML = '<article class="panel"><h3>Editar registros</h3><p class="muted">Cargando publicaciones y documentos...</p></article>';
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          target.innerHTML = '<article class="panel"><h3>Editar registros</h3><p class="message error">' +
+            esc(res && res.mensaje ? res.mensaje : 'No se pudieron cargar registros.') + '</p></article>';
+          return;
+        }
+        window.portalAdminEdicion = {
+          publicaciones: res.publicaciones || [],
+          documentos: res.documentos || []
+        };
+        target.innerHTML = renderEdicionRegistrosAdmin(res);
+      })
+      .withFailureHandler(function(error) {
+        target.innerHTML = '<article class="panel"><h3>Editar registros</h3><p class="message error">' +
+          esc(error.message || String(error)) + '</p></article>';
+      })
+      .obtenerGestionClienteAdmin(select.value, token);
+  }
+
+  function renderEdicionRegistrosAdmin(data) {
+    const cliente = data.cliente || {};
+    return [
+      renderGestionClienteDatos(cliente),
+      renderEdicionGrupoPublicaciones(data.publicaciones || []),
+      renderEdicionGrupoDocumentos(data.documentos || [])
+    ].join('');
+  }
+
+  function renderEdicionGrupoPublicaciones(items) {
+    if (!items.length) {
+      return '<article class="panel"><h3>Publicaciones / visitas</h3><p class="muted">Sin publicaciones para editar.</p></article>';
+    }
+
+    return '<article class="panel"><h3>Publicaciones / visitas</h3><div class="list">' + items.map(function(item, index) {
+      return '<div class="item"><strong>' + esc(item.titulo || item.id || 'Publicacion') + '</strong><small>' +
+        esc([item.fecha, item.detalle, item.id].filter(Boolean).join(' - ')) +
+        '</small><p>' + esc(item.resumen || '') + '</p><span class="visibility-pill visibility-' +
+        esc(String(item.visible || 'NO').toLowerCase()) + '">Visible: ' + esc(item.visible || 'NO') +
+        '</span><div id="editor-publicacion-' + index + '" class="edit-box hidden"></div><div class="edit-actions"><button type="button" class="secondary-button" onclick="abrirEditorPublicacionAdmin(' +
+        index + ')">Editar</button></div></div>';
+    }).join('') + '</div></article>';
+  }
+
+  function renderEdicionGrupoDocumentos(items) {
+    if (!items.length) {
+      return '<article class="panel"><h3>Documentos / PDFs</h3><p class="muted">Sin documentos para editar.</p></article>';
+    }
+
+    return '<article class="panel"><h3>Documentos / PDFs</h3><div class="list">' + items.map(function(item, index) {
+      const link = item.url ? '<a class="doc-link secondary-doc-link" href="' + esc(item.url) + '" target="_blank" rel="noopener">Abrir documento</a>' : '';
+      return '<div class="item"><strong>' + esc(item.titulo || item.id || 'Documento') + '</strong><small>' +
+        esc([item.fecha, item.detalle, item.id].filter(Boolean).join(' - ')) +
+        '</small><p>' + esc(item.resumen || '') + '</p><span class="visibility-pill visibility-' +
+        esc(String(item.visible || 'NO').toLowerCase()) + '">Visible: ' + esc(item.visible || 'NO') +
+        '</span>' + link + '<div id="editor-documento-' + index + '" class="edit-box hidden"></div><div class="edit-actions"><button type="button" class="secondary-button" onclick="abrirEditorDocumentoAdmin(' +
+        index + ')">Editar</button></div></div>';
+    }).join('') + '</div></article>';
+  }
+
+  function abrirEditorPublicacionAdmin(index) {
+    const item = (window.portalAdminEdicion.publicaciones || [])[index];
+    const target = document.getElementById('editor-publicacion-' + index);
+    if (!item || !target) return;
+
+    target.classList.remove('hidden');
+    target.innerHTML = '<div class="form-grid">' +
+      '<label>Fecha visita<input name="fechaVisita" type="date" value="' + esc(item.fechaVisita || '') + '"></label>' +
+      '<label>Sucursal<input name="sucursal" value="' + esc(item.sucursal || '') + '"></label>' +
+      '<label>Tipo servicio<input name="tipoServicio" value="' + esc(item.tipoServicio || '') + '"></label>' +
+      '<label>Titulo<input name="titulo" value="' + esc(item.titulo || '') + '"></label>' +
+      '<label>Categoria<input name="categoria" value="' + esc(item.categoria || '') + '"></label>' +
+      '<label>Estado publicacion<input name="estadoPublicacion" value="' + esc(item.estadoPublicacion || '') + '"></label>' +
+      '<label>Visible<select name="visible"><option value="SI"' + selectedIf(item.visible, 'SI') + '>SI</option><option value="NO"' + selectedIf(item.visible, 'NO') + '>NO</option></select></label>' +
+      '</div><label>Resumen cliente<textarea name="resumenCliente">' + esc(item.resumenCliente || '') +
+      '</textarea></label><label>Contenido<textarea name="contenido">' + esc(item.contenido || '') +
+      '</textarea></label><div class="edit-actions"><button type="button" onclick="guardarEdicionPublicacionAdmin(' +
+      index + ')">Guardar cambios</button><button type="button" class="secondary-button" onclick="cerrarEditorAdmin(\'editor-publicacion-' +
+      index + '\')">Cancelar</button></div>';
+  }
+
+  function abrirEditorDocumentoAdmin(index) {
+    const item = (window.portalAdminEdicion.documentos || [])[index];
+    const target = document.getElementById('editor-documento-' + index);
+    if (!item || !target) return;
+
+    target.classList.remove('hidden');
+    target.innerHTML = '<div class="form-grid">' +
+      '<label>Titulo<input name="titulo" value="' + esc(item.titulo || '') + '"></label>' +
+      '<label>Tipo<input name="tipo" value="' + esc(item.detalle || '') + '"></label>' +
+      '<label>URL<input name="url" value="' + esc(item.url || '') + '"></label>' +
+      '<label>Carpeta Drive ID<input name="carpetaDriveId" value="' + esc(item.carpetaDriveId || '') + '"></label>' +
+      '<label>Visible<select name="visible"><option value="SI"' + selectedIf(item.visible, 'SI') + '>SI</option><option value="NO"' + selectedIf(item.visible, 'NO') + '>NO</option></select></label>' +
+      '</div><label>Descripcion<textarea name="descripcion">' + esc(item.descripcion || item.resumen || '') +
+      '</textarea></label><div class="edit-actions"><button type="button" onclick="guardarEdicionDocumentoAdmin(' +
+      index + ')">Guardar cambios</button><button type="button" class="secondary-button" onclick="cerrarEditorAdmin(\'editor-documento-' +
+      index + '\')">Cancelar</button></div>';
+  }
+
+  function guardarEdicionPublicacionAdmin(index) {
+    const item = (window.portalAdminEdicion.publicaciones || [])[index];
+    const target = document.getElementById('editor-publicacion-' + index);
+    if (!item || !target) return;
+    guardarEdicionRegistroAdmin('actualizarPublicacionAdmin', item.id, target, 'Publicacion actualizada.');
+  }
+
+  function guardarEdicionDocumentoAdmin(index) {
+    const item = (window.portalAdminEdicion.documentos || [])[index];
+    const target = document.getElementById('editor-documento-' + index);
+    if (!item || !target) return;
+    guardarEdicionRegistroAdmin('actualizarDocumentoAdmin', item.id, target, 'Documento actualizado.');
+  }
+
+  function guardarEdicionRegistroAdmin(fn, id, editor, okMessage) {
+    const token = obtenerAdminToken();
+    if (!token) {
+      setMessage('adminMensaje', 'Primero ingresa con PIN admin.', true);
+      mostrarLoginAdmin();
+      return;
+    }
+
+    const data = {};
+    Array.prototype.forEach.call(editor.querySelectorAll('input, textarea, select'), function(el) {
+      if (!el.name) return;
+      data[el.name] = el.value;
+    });
+
+    setMessage('adminMensaje', 'Guardando cambios...');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          setMessage('adminMensaje', res && res.mensaje ? res.mensaje : 'No se pudo actualizar.', true);
+          return;
+        }
+        setMessage('adminMensaje', okMessage);
+        cargarEdicionRegistrosAdmin();
+        recargarAdminListas();
+      })
+      .withFailureHandler(function(error) {
+        setMessage('adminMensaje', error.message || String(error), true);
+      })[fn](id, data, token);
+  }
+
+  function cerrarEditorAdmin(id) {
+    const target = document.getElementById(id);
+    if (!target) return;
+    target.innerHTML = '';
+    target.classList.add('hidden');
+  }
+
+  function selectedIf(actual, esperado) {
+    return String(actual || '').toUpperCase() === esperado ? ' selected' : '';
   }
 
   function actualizarSelectsPublicacionesDependientes() {

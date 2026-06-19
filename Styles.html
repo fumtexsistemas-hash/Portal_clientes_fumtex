@@ -394,6 +394,19 @@
     border: 1px solid rgba(180, 35, 24, 0.18);
   }
 
+  .edit-box {
+    margin-top: 12px;
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+  }
+
+  .edit-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
   @media (max-width: 900px) {
     .grid-3 { grid-template-columns: 1fr; }
     .topbar { align-items: flex-start; flex-direction: column; }
@@ -403,5 +416,6 @@
     .admin-preview-grid { grid-template-columns: 1fr; }
     .admin-preview-grid .panel:first-child { grid-row: auto; }
     .visibility-item { flex-direction: column; }
+    .edit-actions { flex-direction: column; }
   }
 </style>
