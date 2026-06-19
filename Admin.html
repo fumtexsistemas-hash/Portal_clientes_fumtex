@@ -58,6 +58,7 @@
           <button type="button" class="admin-tab" data-admin-tab="publicaciones" onclick="mostrarAdminTab('publicaciones')">Visitas/Publicaciones</button>
           <button type="button" class="admin-tab" data-admin-tab="monitoreos" onclick="mostrarAdminTab('monitoreos')">Monitoreos</button>
           <button type="button" class="admin-tab" data-admin-tab="documentos" onclick="mostrarAdminTab('documentos')">Documentos</button>
+          <button type="button" class="admin-tab" data-admin-tab="vistaCliente" onclick="mostrarAdminTab('vistaCliente')">Vista cliente</button>
         </nav>
 
         <p id="adminMensaje" class="message"></p>
@@ -287,6 +288,28 @@
             </label>
             <button type="submit">Guardar documento</button>
           </form>
+        </section>
+
+        <section id="adminTab-vistaCliente" class="admin-tab-panel hidden">
+          <section class="panel admin-form">
+            <h2>Vista cliente</h2>
+            <p class="muted">Seleccion&aacute; un cliente para revisar qu&eacute; publicaciones, monitoreos y documentos visibles tiene cargados.</p>
+            <div class="form-grid">
+              <label>Cliente
+                <select id="selectClienteVista" onchange="limpiarVistaClienteAdmin()">
+                  <option value="">Cargando clientes...</option>
+                </select>
+              </label>
+            </div>
+            <button type="button" onclick="cargarVistaClienteAdmin()">Ver datos del cliente</button>
+          </section>
+
+          <section id="vistaClienteResultado" class="admin-preview-grid">
+            <article class="panel">
+              <h3>Datos del cliente</h3>
+              <p class="muted">Seleccion&aacute; un cliente para ver la informaci&oacute;n visible.</p>
+            </article>
+          </section>
         </section>
       </section>
     </main>

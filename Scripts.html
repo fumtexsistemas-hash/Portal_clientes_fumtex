@@ -356,7 +356,7 @@
 
   function actualizarSelectsClientesAdmin() {
     const clientes = window.portalAdminClientes || [];
-    const ids = ['selectClienteUsuario', 'selectClientePublicacion', 'selectClienteMonitoreo', 'selectClienteDocumento'];
+    const ids = ['selectClienteUsuario', 'selectClientePublicacion', 'selectClienteMonitoreo', 'selectClienteDocumento', 'selectClienteVista'];
     ids.forEach(function(id) {
       const select = document.getElementById(id);
       if (!select) return;
@@ -382,6 +382,105 @@
 
     completarCuitUsuarioDesdeCliente();
     actualizarSelectsPublicacionesDependientes();
+  }
+
+  function limpiarVistaClienteAdmin() {
+    const target = document.getElementById('vistaClienteResultado');
+    if (!target) return;
+    target.innerHTML = '<article class="panel"><h3>Datos del cliente</h3><p class="muted">Toc&aacute; "Ver datos del cliente" para cargar la vista.</p></article>';
+  }
+
+  function cargarVistaClienteAdmin() {
+    const select = document.getElementById('selectClienteVista');
+    const target = document.getElementById('vistaClienteResultado');
+    const token = obtenerAdminToken();
+    if (!select || !target) return;
+
+    if (!token) {
+      setMessage('adminMensaje', 'Primero ingresa con PIN admin.', true);
+      mostrarLoginAdmin();
+      return;
+    }
+
+    if (!select.value) {
+      target.innerHTML = '<article class="panel"><h3>Datos del cliente</h3><p class="message error">Seleccion&aacute; un cliente.</p></article>';
+      return;
+    }
+
+    target.innerHTML = '<article class="panel"><h3>Vista cliente</h3><p class="muted">Cargando datos visibles...</p></article>';
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          target.innerHTML = '<article class="panel"><h3>Vista cliente</h3><p class="message error">' +
+            esc(res && res.mensaje ? res.mensaje : 'No se pudo cargar la vista.') + '</p></article>';
+          return;
+        }
+        target.innerHTML = renderVistaClienteAdmin(res);
+      })
+      .withFailureHandler(function(error) {
+        target.innerHTML = '<article class="panel"><h3>Vista cliente</h3><p class="message error">' +
+          esc(error.message || String(error)) + '</p></article>';
+      })
+      .obtenerVistaClienteAdmin(select.value, token);
+  }
+
+  function renderVistaClienteAdmin(data) {
+    const cliente = data.cliente || {};
+    return [
+      renderVistaClienteDatos(cliente),
+      renderVistaClientePublicaciones(data.publicaciones || []),
+      renderVistaClienteMonitoreos(data.monitoreos || []),
+      renderVistaClienteDocumentos(data.documentos || [])
+    ].join('');
+  }
+
+  function renderVistaClienteDatos(cliente) {
+    const nombre = cliente.razonSocial || cliente.nombreFantasia || 'Cliente';
+    return '<article class="panel"><span class="eyebrow">Cliente</span><h3>' + esc(nombre) +
+      '</h3><p><strong>ID:</strong> ' + esc(cliente.idPortalCliente || '') + '</p><p><strong>CUIT:</strong> ' +
+      esc(cliente.cuit || '') + '</p><p><strong>Email:</strong> ' + esc(cliente.emailPrincipal || '') +
+      '</p><p><strong>Tel&eacute;fono:</strong> ' + esc(cliente.telefono || '') + '</p><p><strong>Direcci&oacute;n:</strong> ' +
+      esc(cliente.direccion || '') + '</p></article>';
+  }
+
+  function renderVistaClientePublicaciones(publicaciones) {
+    if (!publicaciones.length) {
+      return '<article class="panel"><h3>Publicaciones visibles</h3><p class="muted">Sin publicaciones visibles.</p></article>';
+    }
+
+    return '<article class="panel"><h3>Publicaciones visibles</h3><div class="list">' + publicaciones.map(function(item) {
+      const meta = [item.fechaVisita, item.tipoServicio, item.sucursal].filter(Boolean).join(' — ');
+      return '<div class="item"><strong>' + esc(item.titulo || 'Publicacion') + '</strong><small>' +
+        esc(meta || item.categoria || '') + '</small><p>' + esc(item.resumenCliente || item.contenido || '') +
+        '</p></div>';
+    }).join('') + '</div></article>';
+  }
+
+  function renderVistaClienteMonitoreos(monitoreos) {
+    if (!monitoreos.length) {
+      return '<article class="panel"><h3>Monitoreos visibles</h3><p class="muted">Sin monitoreos visibles.</p></article>';
+    }
+
+    return '<article class="panel"><h3>Monitoreos visibles</h3><div class="list">' + monitoreos.map(function(item) {
+      const meta = [item.fecha, item.sector, item.puntoControl, item.tipo].filter(Boolean).join(' — ');
+      return '<div class="item"><strong>' + esc(meta || 'Monitoreo') + '</strong><p>' +
+        esc(item.resultado || '') + '</p><small>' + esc([item.novedad, item.accionCorrectiva, item.observaciones].filter(Boolean).join(' - ')) +
+        '</small></div>';
+    }).join('') + '</div></article>';
+  }
+
+  function renderVistaClienteDocumentos(documentos) {
+    if (!documentos.length) {
+      return '<article class="panel"><h3>Documentos visibles</h3><p class="muted">Sin documentos visibles.</p></article>';
+    }
+
+    return '<article class="panel"><h3>Documentos visibles</h3><div class="list">' + documentos.map(function(item) {
+      const link = item.url
+        ? '<a class="doc-link" href="' + esc(item.url) + '" target="_blank" rel="noopener">Abrir documento</a>'
+        : '<small>Sin URL disponible</small>';
+      return '<div class="item"><strong>' + esc(item.titulo || 'Documento') + '</strong><small>' +
+        esc(item.tipo || '') + '</small><p>' + esc(item.descripcion || '') + '</p>' + link + '</div>';
+    }).join('') + '</div></article>';
   }
 
   function actualizarSelectsPublicacionesDependientes() {

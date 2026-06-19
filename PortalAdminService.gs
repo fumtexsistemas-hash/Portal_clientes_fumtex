@@ -199,6 +199,87 @@ function listarPublicacionesPortalAdmin(adminToken) {
   return { ok: true, publicaciones: publicaciones };
 }
 
+function obtenerVistaClienteAdmin(idPortalCliente, adminToken) {
+  validarAdminToken_(adminToken);
+  const id = normalizarTexto_(idPortalCliente);
+  if (!id) throw new Error('Falta seleccionar un cliente.');
+
+  const cliente = obtenerClientePortalPorIdAdmin_(id);
+  if (!cliente) {
+    throw new Error('No existe un cliente portal con ID_PORTAL_CLIENTE: ' + id);
+  }
+
+  const publicaciones = leerFilasPorHeaders_(obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.PUBLICACIONES))
+    .filter(function(row) {
+      return normalizarTexto_(row.ID_PORTAL_CLIENTE) === id && esSi_(row.VISIBLE);
+    })
+    .map(function(row) {
+      return {
+        idPublicacion: normalizarTexto_(row.ID_PUBLICACION),
+        fechaVisita: formatearFecha_(row.FECHA_VISITA),
+        sucursal: normalizarTexto_(row.SUCURSAL),
+        tipoServicio: normalizarTexto_(row.TIPO_SERVICIO),
+        titulo: normalizarTexto_(row.TITULO),
+        categoria: normalizarTexto_(row.CATEGORIA),
+        resumenCliente: normalizarTexto_(row.RESUMEN_CLIENTE),
+        contenido: normalizarTexto_(row.CONTENIDO)
+      };
+    });
+
+  const monitoreos = leerFilasPorHeaders_(obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.MONITOREOS))
+    .filter(function(row) {
+      return normalizarTexto_(row.ID_PORTAL_CLIENTE) === id && esSi_(row.VISIBLE);
+    })
+    .map(function(row) {
+      return {
+        idMonitoreo: normalizarTexto_(row.ID_MONITOREO),
+        idPublicacion: normalizarTexto_(row.ID_PUBLICACION),
+        fecha: formatearFecha_(row.FECHA),
+        sector: normalizarTexto_(row.SECTOR),
+        puntoControl: normalizarTexto_(row.PUNTO_CONTROL),
+        tipo: normalizarTexto_(row.TIPO),
+        resultado: normalizarTexto_(row.RESULTADO),
+        novedad: normalizarTexto_(row.NOVEDAD),
+        accionCorrectiva: normalizarTexto_(row.ACCION_CORRECTIVA),
+        observaciones: normalizarTexto_(row.OBSERVACIONES)
+      };
+    });
+
+  const documentos = leerFilasPorHeaders_(obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.DOCUMENTOS))
+    .filter(function(row) {
+      return normalizarTexto_(row.ID_PORTAL_CLIENTE) === id && esSi_(row.VISIBLE);
+    })
+    .map(function(row) {
+      return {
+        idDocumento: normalizarTexto_(row.ID_DOCUMENTO),
+        idPublicacion: normalizarTexto_(row.ID_PUBLICACION),
+        titulo: normalizarTexto_(row.TITULO),
+        tipo: normalizarTexto_(row.TIPO),
+        url: normalizarTexto_(row.URL),
+        descripcion: normalizarTexto_(row.DESCRIPCION),
+        fechaCarga: formatearFecha_(row.FECHA_CARGA)
+      };
+    });
+
+  return {
+    ok: true,
+    cliente: {
+      idPortalCliente: normalizarTexto_(cliente.ID_PORTAL_CLIENTE),
+      idClienteOrigen: normalizarTexto_(cliente.ID_CLIENTE_ORIGEN),
+      cuit: normalizarTexto_(cliente.CUIT),
+      razonSocial: normalizarTexto_(cliente.RAZON_SOCIAL),
+      nombreFantasia: normalizarTexto_(cliente.NOMBRE_FANTASIA),
+      emailPrincipal: normalizarTexto_(cliente.EMAIL_PRINCIPAL),
+      telefono: normalizarTexto_(cliente.TELEFONO),
+      direccion: normalizarTexto_(cliente.DIRECCION),
+      activo: normalizarTexto_(cliente.ACTIVO)
+    },
+    publicaciones: publicaciones,
+    monitoreos: monitoreos,
+    documentos: documentos
+  };
+}
+
 function validarDataAdmin_(data, campos) {
   if (!data) throw new Error('No se recibieron datos.');
   campos.forEach(function(campo) {
@@ -227,6 +308,17 @@ function obtenerClientePortalActivoPorId_(idPortalCliente) {
   }
 
   return cliente;
+}
+
+function obtenerClientePortalPorIdAdmin_(idPortalCliente) {
+  const id = normalizarTexto_(idPortalCliente);
+  if (!id) return null;
+
+  const hojaClientes = obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.CLIENTES);
+  const clientes = leerFilasPorHeaders_(hojaClientes);
+  return clientes.find(function(row) {
+    return normalizarTexto_(row.ID_PORTAL_CLIENTE) === id;
+  }) || null;
 }
 
 function validarAdminPortal_() {
