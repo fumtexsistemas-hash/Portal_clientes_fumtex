@@ -59,6 +59,7 @@
           <button type="button" class="admin-tab" data-admin-tab="monitoreos" onclick="mostrarAdminTab('monitoreos')">Monitoreos</button>
           <button type="button" class="admin-tab" data-admin-tab="documentos" onclick="mostrarAdminTab('documentos')">Documentos</button>
           <button type="button" class="admin-tab" data-admin-tab="vistaCliente" onclick="mostrarAdminTab('vistaCliente')">Vista cliente</button>
+          <button type="button" class="admin-tab" data-admin-tab="visibilidad" onclick="mostrarAdminTab('visibilidad')">Gestionar visibilidad</button>
         </nav>
 
         <p id="adminMensaje" class="message"></p>
@@ -308,6 +309,28 @@
             <article class="panel">
               <h3>Datos del cliente</h3>
               <p class="muted">Seleccion&aacute; un cliente para ver la informaci&oacute;n visible.</p>
+            </article>
+          </section>
+        </section>
+
+        <section id="adminTab-visibilidad" class="admin-tab-panel hidden">
+          <section class="panel admin-form">
+            <h2>Gestionar visibilidad</h2>
+            <p class="muted">Public&aacute; u ocult&aacute; registros del portal cliente sin borrar informaci&oacute;n.</p>
+            <div class="form-grid">
+              <label>Cliente
+                <select id="selectClienteVisibilidad" onchange="limpiarGestionVisibilidadAdmin()">
+                  <option value="">Cargando clientes...</option>
+                </select>
+              </label>
+            </div>
+            <button type="button" onclick="cargarGestionVisibilidadAdmin()">Cargar registros</button>
+          </section>
+
+          <section id="gestionVisibilidadResultado" class="admin-preview-grid">
+            <article class="panel">
+              <h3>Registros del cliente</h3>
+              <p class="muted">Seleccion&aacute; un cliente para gestionar visibilidad.</p>
             </article>
           </section>
         </section>

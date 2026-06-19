@@ -356,7 +356,7 @@
 
   function actualizarSelectsClientesAdmin() {
     const clientes = window.portalAdminClientes || [];
-    const ids = ['selectClienteUsuario', 'selectClientePublicacion', 'selectClienteMonitoreo', 'selectClienteDocumento', 'selectClienteVista'];
+    const ids = ['selectClienteUsuario', 'selectClientePublicacion', 'selectClienteMonitoreo', 'selectClienteDocumento', 'selectClienteVista', 'selectClienteVisibilidad'];
     ids.forEach(function(id) {
       const select = document.getElementById(id);
       if (!select) return;
@@ -481,6 +481,128 @@
       return '<div class="item"><strong>' + esc(item.titulo || 'Documento') + '</strong><small>' +
         esc(item.tipo || '') + '</small><p>' + esc(item.descripcion || '') + '</p>' + link + '</div>';
     }).join('') + '</div></article>';
+  }
+
+  function limpiarGestionVisibilidadAdmin() {
+    const target = document.getElementById('gestionVisibilidadResultado');
+    if (!target) return;
+    target.innerHTML = '<article class="panel"><h3>Registros del cliente</h3><p class="muted">Toc&aacute; "Cargar registros" para gestionar visibilidad.</p></article>';
+  }
+
+  function cargarGestionVisibilidadAdmin() {
+    const select = document.getElementById('selectClienteVisibilidad');
+    const target = document.getElementById('gestionVisibilidadResultado');
+    const token = obtenerAdminToken();
+    if (!select || !target) return;
+
+    if (!token) {
+      setMessage('adminMensaje', 'Primero ingresa con PIN admin.', true);
+      mostrarLoginAdmin();
+      return;
+    }
+
+    if (!select.value) {
+      target.innerHTML = '<article class="panel"><h3>Registros del cliente</h3><p class="message error">Seleccion&aacute; un cliente.</p></article>';
+      return;
+    }
+
+    target.innerHTML = '<article class="panel"><h3>Gestionar visibilidad</h3><p class="muted">Cargando registros...</p></article>';
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          target.innerHTML = '<article class="panel"><h3>Gestionar visibilidad</h3><p class="message error">' +
+            esc(res && res.mensaje ? res.mensaje : 'No se pudo cargar la gestion.') + '</p></article>';
+          return;
+        }
+        target.innerHTML = renderGestionVisibilidadAdmin(res);
+      })
+      .withFailureHandler(function(error) {
+        target.innerHTML = '<article class="panel"><h3>Gestionar visibilidad</h3><p class="message error">' +
+          esc(error.message || String(error)) + '</p></article>';
+      })
+      .obtenerGestionClienteAdmin(select.value, token);
+  }
+
+  function renderGestionVisibilidadAdmin(data) {
+    const cliente = data.cliente || {};
+    return [
+      renderGestionClienteDatos(cliente),
+      renderGestionGrupoVisibilidad('Publicaciones', 'publicacion', data.publicaciones || []),
+      renderGestionGrupoVisibilidad('Monitoreos', 'monitoreo', data.monitoreos || []),
+      renderGestionGrupoVisibilidad('Documentos', 'documento', data.documentos || [])
+    ].join('');
+  }
+
+  function renderGestionClienteDatos(cliente) {
+    const nombre = cliente.razonSocial || cliente.nombreFantasia || 'Cliente';
+    return '<article class="panel"><span class="eyebrow">Cliente</span><h3>' + esc(nombre) +
+      '</h3><p><strong>ID:</strong> ' + esc(cliente.idPortalCliente || '') + '</p><p><strong>CUIT:</strong> ' +
+      esc(cliente.cuit || '') + '</p><p><strong>Email:</strong> ' + esc(cliente.emailPrincipal || '') + '</p></article>';
+  }
+
+  function renderGestionGrupoVisibilidad(titulo, tipo, items) {
+    if (!items.length) {
+      return '<article class="panel"><h3>' + esc(titulo) + '</h3><p class="muted">Sin registros para mostrar.</p></article>';
+    }
+
+    return '<article class="panel"><h3>' + esc(titulo) + '</h3><div class="list">' + items.map(function(item) {
+      return renderGestionItemVisibilidad(tipo, item);
+    }).join('') + '</div></article>';
+  }
+
+  function renderGestionItemVisibilidad(tipo, item) {
+    const visible = String(item.visible || '').toUpperCase() === 'SI' ? 'SI' : 'NO';
+    const nuevoValor = visible === 'SI' ? 'NO' : 'SI';
+    const accion = visible === 'SI' ? 'Ocultar' : 'Publicar';
+    const link = item.url ? '<a class="doc-link secondary-doc-link" href="' + esc(item.url) + '" target="_blank" rel="noopener">Abrir documento</a>' : '';
+    return '<div class="item visibility-item"><div><strong>' + esc(item.titulo || item.id || 'Registro') +
+      '</strong><small>' + esc([item.fecha, item.detalle, item.id].filter(Boolean).join(' - ')) +
+      '</small><p>' + esc(item.resumen || '') + '</p><span class="visibility-pill visibility-' + esc(visible.toLowerCase()) +
+      '">Visible: ' + esc(visible) + '</span>' + link + '</div><button type="button" class="secondary-button" onclick="cambiarVisibleAdmin(\'' +
+      esc(tipo) + '\', \'' + esc(item.id || '') + '\', \'' + esc(nuevoValor) + '\')">' + esc(accion) + '</button></div>';
+  }
+
+  function cambiarVisibleAdmin(tipo, id, visible) {
+    const token = obtenerAdminToken();
+    if (!token) {
+      setMessage('adminMensaje', 'Primero ingresa con PIN admin.', true);
+      mostrarLoginAdmin();
+      return;
+    }
+
+    if (!id) {
+      setMessage('adminMensaje', 'Falta ID del registro.', true);
+      return;
+    }
+
+    const accion = visible === 'SI' ? 'publicar' : 'ocultar';
+    if (!confirm('Confirmar ' + accion + ' este registro?')) return;
+
+    const fnMap = {
+      publicacion: 'cambiarVisiblePublicacionAdmin',
+      monitoreo: 'cambiarVisibleMonitoreoAdmin',
+      documento: 'cambiarVisibleDocumentoAdmin'
+    };
+    const fn = fnMap[tipo];
+    if (!fn) {
+      setMessage('adminMensaje', 'Tipo de registro no valido.', true);
+      return;
+    }
+
+    setMessage('adminMensaje', 'Actualizando visibilidad...');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          setMessage('adminMensaje', res && res.mensaje ? res.mensaje : 'No se pudo actualizar.', true);
+          return;
+        }
+        setMessage('adminMensaje', res.mensaje || 'Visibilidad actualizada.');
+        cargarGestionVisibilidadAdmin();
+        cargarVistaClienteAdmin();
+      })
+      .withFailureHandler(function(error) {
+        setMessage('adminMensaje', error.message || String(error), true);
+      })[fn](id, visible, token);
   }
 
   function actualizarSelectsPublicacionesDependientes() {
