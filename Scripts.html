@@ -8,6 +8,9 @@
     return data;
   }
 
+  window.portalAdminClientes = window.portalAdminClientes || [];
+  window.portalAdminPublicaciones = window.portalAdminPublicaciones || [];
+
   function setMessage(id, text, isError) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -308,7 +311,9 @@
           return;
         }
         const clientes = res.clientes || [];
+        window.portalAdminClientes = clientes;
         target.innerHTML = clientes.length ? clientes.map(renderClienteAdmin).join('') : '<p class="muted">Sin clientes cargados.</p>';
+        actualizarSelectsClientesAdmin();
       })
       .withFailureHandler(function(error) {
         target.innerHTML = '<p class="message error">' + esc(error.message || String(error)) + '</p>';
@@ -327,7 +332,9 @@
           return;
         }
         const publicaciones = res.publicaciones || [];
+        window.portalAdminPublicaciones = publicaciones;
         target.innerHTML = publicaciones.length ? publicaciones.map(renderPublicacionAdmin).join('') : '<p class="muted">Sin publicaciones cargadas.</p>';
+        actualizarSelectsPublicacionesDependientes();
       })
       .withFailureHandler(function(error) {
         target.innerHTML = '<p class="message error">' + esc(error.message || String(error)) + '</p>';
@@ -345,6 +352,118 @@
     return '<article class="item"><strong>' + esc(item.idPublicacion || 'Sin ID') + '</strong><small>' +
       esc(item.titulo || '') + '</small><p>ID cliente: ' + esc(item.idPortalCliente || '') +
       '</p><small>Visible: ' + esc(item.visible || '') + ' - ' + esc(item.fechaCarga || '') + '</small></article>';
+  }
+
+  function actualizarSelectsClientesAdmin() {
+    const clientes = window.portalAdminClientes || [];
+    const ids = ['selectClienteUsuario', 'selectClientePublicacion', 'selectClienteMonitoreo', 'selectClienteDocumento'];
+    ids.forEach(function(id) {
+      const select = document.getElementById(id);
+      if (!select) return;
+      const valorActual = select.value;
+      select.innerHTML = '';
+
+      if (!clientes.length) {
+        select.appendChild(crearOption('', 'No hay clientes cargados. Primero cargá un cliente.'));
+        select.disabled = true;
+        return;
+      }
+
+      select.disabled = false;
+      select.appendChild(crearOption('', 'Seleccioná un cliente'));
+      clientes.forEach(function(cliente) {
+        select.appendChild(crearOption(cliente.idPortalCliente, textoClienteAdmin(cliente)));
+      });
+
+      if (valorActual && clientes.some(function(cliente) { return cliente.idPortalCliente === valorActual; })) {
+        select.value = valorActual;
+      }
+    });
+
+    completarCuitUsuarioDesdeCliente();
+    actualizarSelectsPublicacionesDependientes();
+  }
+
+  function actualizarSelectsPublicacionesDependientes() {
+    actualizarSelectPublicacionesPorCliente('selectClienteMonitoreo', 'selectPublicacionMonitoreo', false);
+    actualizarSelectPublicacionesPorCliente('selectClienteDocumento', 'selectPublicacionDocumento', true);
+  }
+
+  function actualizarSelectPublicacionesPorCliente(clienteSelectId, publicacionSelectId, permiteVacio) {
+    const clienteSelect = document.getElementById(clienteSelectId);
+    const publicacionSelect = document.getElementById(publicacionSelectId);
+    if (!clienteSelect || !publicacionSelect) return;
+
+    const idCliente = clienteSelect.value;
+    const publicaciones = (window.portalAdminPublicaciones || []).filter(function(publicacion) {
+      return publicacion.idPortalCliente === idCliente;
+    });
+    const valorActual = publicacionSelect.value;
+    publicacionSelect.innerHTML = '';
+
+    if (permiteVacio) {
+      publicacionSelect.appendChild(crearOption('', 'Documento general del cliente'));
+    } else {
+      publicacionSelect.appendChild(crearOption('', idCliente ? 'Seleccioná una publicacion' : 'Seleccioná un cliente primero'));
+    }
+
+    if (!idCliente) {
+      publicacionSelect.disabled = !permiteVacio;
+      return;
+    }
+
+    if (!publicaciones.length) {
+      publicacionSelect.appendChild(crearOption('', 'Sin publicaciones para este cliente'));
+      publicacionSelect.disabled = !permiteVacio;
+      return;
+    }
+
+    publicacionSelect.disabled = false;
+    publicaciones.forEach(function(publicacion) {
+      publicacionSelect.appendChild(crearOption(publicacion.idPublicacion, textoPublicacionAdmin(publicacion)));
+    });
+
+    if (valorActual && publicaciones.some(function(publicacion) { return publicacion.idPublicacion === valorActual; })) {
+      publicacionSelect.value = valorActual;
+    }
+  }
+
+  function completarCuitUsuarioDesdeCliente() {
+    const select = document.getElementById('selectClienteUsuario');
+    if (!select) return;
+    const form = select.form;
+    if (!form || !form.elements.cuit) return;
+    const cliente = obtenerClienteAdminPorId(select.value);
+    if (cliente && cliente.cuit) {
+      form.elements.cuit.value = cliente.cuit;
+    }
+  }
+
+  function obtenerClienteAdminPorId(idPortalCliente) {
+    return (window.portalAdminClientes || []).find(function(cliente) {
+      return cliente.idPortalCliente === idPortalCliente;
+    }) || null;
+  }
+
+  function textoClienteAdmin(cliente) {
+    const nombre = cliente.razonSocial || cliente.nombreFantasia || 'Cliente sin nombre';
+    return nombre + ' — CUIT ' + (cliente.cuit || 'sin CUIT') + ' — ' + cliente.idPortalCliente;
+  }
+
+  function textoPublicacionAdmin(publicacion) {
+    return [
+      publicacion.fechaVisita || publicacion.fechaCarga || 'Sin fecha',
+      publicacion.tipoServicio || publicacion.titulo || 'Sin tipo',
+      publicacion.sucursal || 'Sin sucursal',
+      publicacion.idPublicacion
+    ].join(' — ');
+  }
+
+  function crearOption(value, text) {
+    const option = document.createElement('option');
+    option.value = value || '';
+    option.textContent = text || '';
+    return option;
   }
 
   function crearClientePortalUi(event) {

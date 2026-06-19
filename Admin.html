@@ -115,8 +115,10 @@
           <form class="panel admin-form" onsubmit="crearUsuarioPortalUi(event)">
             <h2>Nuevo usuario autorizado</h2>
             <div class="form-grid">
-              <label>ID portal cliente
-                <input name="idPortalCliente" required>
+              <label>Cliente
+                <select id="selectClienteUsuario" name="idPortalCliente" onchange="completarCuitUsuarioDesdeCliente()" required>
+                  <option value="">Cargando clientes...</option>
+                </select>
               </label>
               <label>CUIT
                 <input name="cuit" required>
@@ -148,8 +150,10 @@
           <form class="panel admin-form" onsubmit="crearPublicacionUi(event)">
             <h2>Nueva visita/publicacion</h2>
             <div class="form-grid">
-              <label>ID portal cliente
-                <input name="idPortalCliente" required>
+              <label>Cliente
+                <select id="selectClientePublicacion" name="idPortalCliente" required>
+                  <option value="">Cargando clientes...</option>
+                </select>
               </label>
               <label>ID visita origen
                 <input name="idVisitaOrigen">
@@ -200,11 +204,15 @@
           <form class="panel admin-form" onsubmit="crearMonitoreoUi(event)">
             <h2>Nuevo monitoreo</h2>
             <div class="form-grid">
-              <label>ID publicacion
-                <input name="idPublicacion">
+              <label>Publicacion
+                <select id="selectPublicacionMonitoreo" name="idPublicacion">
+                  <option value="">Seleccion&aacute; un cliente primero</option>
+                </select>
               </label>
-              <label>ID portal cliente
-                <input name="idPortalCliente" required>
+              <label>Cliente
+                <select id="selectClienteMonitoreo" name="idPortalCliente" onchange="actualizarSelectPublicacionesPorCliente('selectClienteMonitoreo', 'selectPublicacionMonitoreo', false)" required>
+                  <option value="">Cargando clientes...</option>
+                </select>
               </label>
               <label>Fecha
                 <input name="fecha" type="date" required>
@@ -245,11 +253,15 @@
           <form class="panel admin-form" onsubmit="crearDocumentoUi(event)">
             <h2>Nuevo documento</h2>
             <div class="form-grid">
-              <label>ID portal cliente
-                <input name="idPortalCliente" required>
+              <label>Cliente
+                <select id="selectClienteDocumento" name="idPortalCliente" onchange="actualizarSelectPublicacionesPorCliente('selectClienteDocumento', 'selectPublicacionDocumento', true)" required>
+                  <option value="">Cargando clientes...</option>
+                </select>
               </label>
-              <label>ID publicacion
-                <input name="idPublicacion">
+              <label>Publicacion
+                <select id="selectPublicacionDocumento" name="idPublicacion">
+                  <option value="">Documento general del cliente</option>
+                </select>
               </label>
               <label>Titulo
                 <input name="titulo" required>

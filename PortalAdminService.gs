@@ -165,7 +165,9 @@ function crearDocumentoAdmin(data, adminToken) {
 function listarClientesPortalAdmin(adminToken) {
   validarAdminToken_(adminToken);
   const hoja = obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.CLIENTES);
-  const clientes = leerFilasPorHeaders_(hoja).map(function(row) {
+  const clientes = leerFilasPorHeaders_(hoja).filter(function(row) {
+    return esSi_(row.ACTIVO);
+  }).map(function(row) {
     return {
       idPortalCliente: normalizarTexto_(row.ID_PORTAL_CLIENTE),
       razonSocial: normalizarTexto_(row.RAZON_SOCIAL),
@@ -187,6 +189,9 @@ function listarPublicacionesPortalAdmin(adminToken) {
       idPortalCliente: normalizarTexto_(row.ID_PORTAL_CLIENTE),
       titulo: normalizarTexto_(row.TITULO),
       categoria: normalizarTexto_(row.CATEGORIA),
+      fechaVisita: formatearFecha_(row.FECHA_VISITA),
+      tipoServicio: normalizarTexto_(row.TIPO_SERVICIO),
+      sucursal: normalizarTexto_(row.SUCURSAL),
       visible: normalizarTexto_(row.VISIBLE),
       fechaCarga: formatearFecha_(row.FECHA_CARGA)
     };
