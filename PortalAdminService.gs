@@ -1,4 +1,4 @@
-function loginAdmin(pin) {
+﻿function loginAdmin(pin) {
   const pinIngresado = normalizarTexto_(pin);
   const pinConfigurado = PropertiesService.getScriptProperties().getProperty('PORTAL_ADMIN_PIN');
 
@@ -830,9 +830,8 @@ function crearDocumentoPdfParteServicio_(datos) {
   const body = doc.getBody();
   body.clear();
 
-  agregarParrafoPdf_(body, 'FUMTEX', { heading: DocumentApp.ParagraphHeading.TITLE, color: '#2A6D33', bold: true });
-  agregarParrafoPdf_(body, 'Servicios Integrales', { color: '#3A8E40', bold: true });
-  agregarParrafoPdf_(body, 'Control de plagas y salud ambiental', { color: '#5E7A63' });
+  agregarParrafoPdf_(body, 'FUMTEX Servicios Integrales', { heading: DocumentApp.ParagraphHeading.TITLE, color: '#3A8E40', bold: true });
+  agregarParrafoPdf_(body, 'Control de plagas y salud ambiental', { color: '#5E7A63', bold: true });
   agregarParrafoPdf_(body, 'Rosario, Argentina', { color: '#5E7A63' });
   agregarParrafoPdf_(body, 'www.fumtex.com.ar', { color: '#2A6D33', bold: true });
   agregarParrafoPdf_(body, 'Registro Control de Vectores Nro. 245', { color: '#5E7A63' });
@@ -841,8 +840,10 @@ function crearDocumentoPdfParteServicio_(datos) {
   agregarParrafoPdf_(body, 'Email: fumtexservicios@gmail.com', { color: '#5E7A63' });
   body.appendHorizontalRule();
 
-  agregarParrafoPdf_(body, 'Parte de servicio', { heading: DocumentApp.ParagraphHeading.HEADING1, color: '#2A6D33', bold: true });
+  agregarParrafoPdf_(body, 'INFORME DE SERVICIO', { heading: DocumentApp.ParagraphHeading.HEADING1, color: '#2A6D33', bold: true });
+  agregarParrafoPdf_(body, 'Control de plagas y salud ambiental', { color: '#5E7A63', bold: true });
   agregarParrafoPdf_(body, 'Fecha de emision: ' + formatearFechaPdf_(new Date()), { color: '#5E7A63' });
+  agregarAclaracionInformePdf_(body);
 
   agregarParrafoPdf_(body, 'Datos del cliente', { heading: DocumentApp.ParagraphHeading.HEADING2, color: '#2A6D33', bold: true });
   agregarTablaClaveValorPdf_(body, [
@@ -880,7 +881,8 @@ function crearDocumentoPdfParteServicio_(datos) {
   }
 
   body.appendHorizontalRule();
-  agregarParrafoPdf_(body, 'Documento generado automaticamente por FUMTEX.', { color: '#5E7A63' });
+  agregarParrafoPdf_(body, 'Documento generado automaticamente desde el Portal Clientes FUMTEX.', { color: '#5E7A63' });
+  agregarParrafoPdf_(body, 'Este informe digital no reemplaza el certificado fisico correspondiente.', { color: '#5E7A63', bold: true });
   agregarParrafoPdf_(body, 'Fecha de emision: ' + formatearFechaPdf_(new Date()), { color: '#5E7A63' });
 
   doc.saveAndClose();
@@ -994,6 +996,14 @@ function formatearFechaPdf_(fecha) {
   return texto;
 }
 
+function agregarAclaracionInformePdf_(body) {
+  const texto = 'Este documento corresponde a un informe digital de servicio realizado por FUMTEX. No reemplaza el certificado fisico, constancia oficial o documentacion impresa que pudiera corresponder segun el servicio contratado o requerimiento del cliente.';
+  const tabla = body.appendTable([[texto]]);
+  tabla.setBorderColor('#C8C8C8');
+  const celda = tabla.getRow(0).getCell(0);
+  celda.setBackgroundColor('#F3F8F3');
+  celda.editAsText().setForegroundColor('#2A6D33').setBold(false);
+}
 function agregarParrafoPdf_(body, texto, opciones) {
   const opts = opciones || {};
   const parrafo = body.appendParagraph(normalizarTexto_(texto));
