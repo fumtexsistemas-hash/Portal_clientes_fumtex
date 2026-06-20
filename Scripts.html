@@ -13,9 +13,22 @@
   window.portalAdminPublicaciones = window.portalAdminPublicaciones || [];
   window.portalAdminEdicion = window.portalAdminEdicion || { publicaciones: [], documentos: [] };
   window.portalAdminOpciones = window.portalAdminOpciones || {};
+  window.portalAdminPuntosCliente = window.portalAdminPuntosCliente || [];
   window.portalVisitaRapidaPuntos = window.portalVisitaRapidaPuntos || 0;
   window.portalVisitaTituloManual = window.portalVisitaTituloManual || false;
   window.portalUltimaVisitaRapida = window.portalUltimaVisitaRapida || null;
+  const ADMIN_TABS_CONFIG = [
+    { id: 'clientes', label: 'Clientes' },
+    { id: 'usuarios', label: 'Usuarios' },
+    { id: 'publicaciones', label: 'Visitas/Publicaciones' },
+    { id: 'visitaRapida', label: 'Nuevo parte de servicio' },
+    { id: 'plantillaPuntos', label: 'Plantilla de puntos' },
+    { id: 'monitoreos', label: 'Monitoreos avanzado' },
+    { id: 'documentos', label: 'Documentos' },
+    { id: 'vistaCliente', label: 'Vista cliente' },
+    { id: 'visibilidad', label: 'Gestionar visibilidad' },
+    { id: 'editarRegistros', label: 'Editar registros' }
+  ];
   const PORTAL_OPCIONES_FALLBACK = {
     SERVICIO: ['Fumigacion', 'Desratizacion', 'Desinsectacion', 'Desinfeccion', 'Monitoreo MIP', 'Inspeccion'],
     TIPO_INTERVENCION: ['Preventivo', 'Correctivo', 'Refuerzo', 'Seguimiento'],
@@ -126,7 +139,7 @@
     });
   }
 
-  function iniciarPortalCliente() {
+  function iniciarPortalClienteClasico_() {
     try {
       console.log('iniciarPortalCliente ejecutado');
       asegurarLayoutCliente();
@@ -236,6 +249,7 @@
 
   function inicializarPantallaAdmin() {
     console.log('inicializarPantallaAdmin');
+    asegurarPestanasAdminCompletas();
     const token = sessionStorage.getItem('portalAdminToken');
     if (token) {
       window.portalAdminToken = token;
@@ -258,6 +272,7 @@
     const panel = document.getElementById('adminAppPanel');
     if (login) login.classList.add('hidden');
     if (panel) panel.classList.remove('hidden');
+    asegurarPestanasAdminCompletas();
   }
 
   function loginAdminUi(event) {
@@ -297,7 +312,54 @@
     return window.portalAdminToken || sessionStorage.getItem('portalAdminToken') || '';
   }
 
+  function asegurarPestanasAdminCompletas() {
+    const panel = document.getElementById('adminAppPanel');
+    if (!panel) return;
+
+    let nav = panel.querySelector('.admin-tabs');
+    if (!nav) {
+      nav = document.createElement('nav');
+      nav.className = 'admin-tabs';
+      nav.setAttribute('aria-label', 'Secciones admin');
+      const mensaje = document.getElementById('adminMensaje');
+      panel.insertBefore(nav, mensaje || panel.firstChild);
+    }
+
+    ADMIN_TABS_CONFIG.forEach(function(tab) {
+      let button = nav.querySelector('[data-admin-tab="' + tab.id + '"]');
+      if (!button) {
+        button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'admin-tab';
+        button.dataset.adminTab = tab.id;
+        button.textContent = tab.label;
+        button.addEventListener('click', function() {
+          mostrarAdminTab(tab.id);
+        });
+        nav.appendChild(button);
+      } else {
+        button.classList.add('admin-tab');
+        button.type = 'button';
+        if (!button.getAttribute('onclick')) {
+          button.addEventListener('click', function() {
+            mostrarAdminTab(tab.id);
+          });
+        }
+      }
+    });
+  }
+
+  function ejecutarSeguroAdmin_(fn, nombre) {
+    try {
+      if (typeof fn === 'function') fn();
+    } catch (error) {
+      console.error('Error cargando ' + nombre + ' admin', error);
+      setMessage('adminMensaje', 'No se pudo cargar ' + nombre + '. Las pestañas siguen disponibles.', true);
+    }
+  }
+
   function mostrarAdminTab(tab) {
+    asegurarPestanasAdminCompletas();
     Array.prototype.forEach.call(document.querySelectorAll('.admin-tab-panel'), function(panel) {
       panel.classList.add('hidden');
     });
@@ -307,22 +369,30 @@
 
     const target = document.getElementById('adminTab-' + tab);
     if (target) target.classList.remove('hidden');
-    if (tab === 'visitaRapida' && !Object.keys(window.portalAdminOpciones || {}).length) {
-      cargarOpcionesCargaRapidaAdmin();
-    }
-    if (tab === 'visitaRapida' && !document.querySelector('#visitaRapidaPuntos .visita-punto')) {
-      agregarPuntoVisitaRapida();
-    }
-    if (tab === 'visitaRapida') {
-      actualizarModoPuntosVisitaRapida();
-      actualizarPreviewVisitaRapida();
+    try {
+      if (tab === 'visitaRapida' && !Object.keys(window.portalAdminOpciones || {}).length) {
+        cargarOpcionesCargaRapidaAdmin();
+      }
+      if (tab === 'visitaRapida' && !document.querySelector('#visitaRapidaPuntos .visita-punto')) {
+        agregarPuntoVisitaRapida();
+      }
+      if (tab === 'visitaRapida') {
+        actualizarModoPuntosVisitaRapida();
+        actualizarPreviewVisitaRapida();
+      }
+      if (tab === 'plantillaPuntos') {
+        llenarOpcionesPlantillaPuntos();
+      }
+    } catch (error) {
+      console.error('Error preparando pestaña admin', tab, error);
+      setMessage('adminMensaje', 'La pestaña se abrió, pero hubo un problema preparando algunos datos. Revisá la consola o actualizá listas.', true);
     }
   }
 
   function recargarAdminListas() {
-    cargarClientesAdmin();
-    cargarPublicacionesAdmin();
-    cargarOpcionesPortalAdmin();
+    ejecutarSeguroAdmin_(cargarClientesAdmin, 'clientes');
+    ejecutarSeguroAdmin_(cargarPublicacionesAdmin, 'publicaciones');
+    ejecutarSeguroAdmin_(cargarOpcionesPortalAdmin, 'opciones');
   }
 
   function cargarOpcionesPortalAdmin() {
@@ -430,6 +500,12 @@
     });
   }
 
+  function llenarOpcionesPlantillaPuntos() {
+    llenarSelectOpcionesPortal('selectPuntoClienteTipo', 'TIPO_PUNTO', 'Selecciona tipo de punto');
+    llenarSelectOpcionesPortal('selectPuntoClienteResultado', 'RESULTADO_MONITOREO', 'Selecciona resultado');
+    llenarSelectOpcionesPortal('selectPuntoClienteAccion', 'ACCION_CORRECTIVA', 'Selecciona accion');
+  }
+
   function agregarPuntoVisitaRapida(punto) {
     const target = document.getElementById('visitaRapidaPuntos');
     if (!target) return;
@@ -437,14 +513,14 @@
     const wrapper = document.createElement('div');
     wrapper.className = 'item visita-punto';
     wrapper.dataset.puntoIndex = String(index);
-    wrapper.innerHTML = '<div class="visibility-item"><div><strong>Punto monitoreado</strong><small>Completá solo los puntos relevados</small></div>' +
+    wrapper.innerHTML = '<div class="visibility-item"><div><strong>Punto monitoreado</strong><small>Completa solo los puntos relevados</small></div>' +
       '<button type="button" class="secondary-button" onclick="quitarPuntoVisitaRapida(this)">Quitar punto</button></div>' +
       '<div class="form-grid">' +
       '<label>Sector<input name="sector" value="' + esc(punto && punto.sector || '') + '"></label>' +
       '<label>Punto de control<input name="puntoControl" value="' + esc(punto && punto.puntoControl || '') + '"></label>' +
       '<label>Tipo de punto<select id="visitaTipoPunto-' + index + '" name="tipoPunto" data-opciones-grupo="TIPO_PUNTO" data-placeholder="Selecciona tipo de punto"></select></label>' +
       '<label>Resultado<select id="visitaResultado-' + index + '" name="resultado" data-opciones-grupo="RESULTADO_MONITOREO" data-placeholder="Selecciona resultado"></select></label>' +
-      '<label>Acción correctiva<select id="visitaAccion-' + index + '" name="accionCorrectiva" data-opciones-grupo="ACCION_CORRECTIVA" data-placeholder="Selecciona accion"></select></label>' +
+      '<label>Accion correctiva<select id="visitaAccion-' + index + '" name="accionCorrectiva" data-opciones-grupo="ACCION_CORRECTIVA" data-placeholder="Selecciona accion"></select></label>' +
       '</div><label>Novedad<textarea name="novedad">' + esc(punto && punto.novedad || '') +
       '</textarea></label><label>Observaciones<textarea name="observaciones">' + esc(punto && punto.observaciones || '') + '</textarea></label>';
     target.appendChild(wrapper);
@@ -486,7 +562,7 @@
           setMessage('adminMensaje', res && res.mensaje ? res.mensaje : 'No se pudo guardar la visita.', true);
           return;
         }
-        setMessage('adminMensaje', 'Visita cargada correctamente. Publicación: ' + res.idPublicacion + '. Puntos cargados: ' + res.cantidadMonitoreos + '.');
+        setMessage('adminMensaje', 'Visita cargada correctamente. Publicacion: ' + res.idPublicacion + '. Puntos cargados: ' + res.cantidadMonitoreos + '.');
         limpiarVisitaRapida();
         recargarAdminListas();
       })
@@ -685,6 +761,237 @@
     });
   }
 
+  function limpiarPlantillaPuntosAdmin() {
+    window.portalAdminPuntosCliente = [];
+    limpiarFormPuntoCliente();
+    const target = document.getElementById('plantillaPuntosLista');
+    if (target) target.innerHTML = '<p class="muted">Toca Cargar plantilla para ver los puntos del cliente.</p>';
+  }
+
+  function inicializarPuntosClienteAdminUi() {
+    const token = obtenerAdminToken();
+    if (!token) {
+      setMessage('adminMensaje', 'Primero ingresa con PIN admin.', true);
+      mostrarLoginAdmin();
+      return;
+    }
+    if (!confirm('Esto creara PORTAL_PUNTOS_CLIENTE si no existe y agregara encabezados solo si la hoja esta vacia. Continuar?')) return;
+
+    setMessage('adminMensaje', 'Inicializando plantilla de puntos...');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          setMessage('adminMensaje', res && res.mensaje ? res.mensaje : 'No se pudo inicializar la plantilla de puntos.', true);
+          return;
+        }
+        setMessage('adminMensaje', res.mensaje || 'Plantilla de puntos inicializada.');
+      })
+      .withFailureHandler(function(error) {
+        setMessage('adminMensaje', error.message || String(error), true);
+      })
+      .inicializarPuntosClienteAdmin(token);
+  }
+
+  function cargarPlantillaPuntosAdmin() {
+    const token = obtenerAdminToken();
+    const select = document.getElementById('selectClientePlantillaPuntos');
+    const target = document.getElementById('plantillaPuntosLista');
+    if (!token) {
+      setMessage('adminMensaje', 'Primero ingresa con PIN admin.', true);
+      mostrarLoginAdmin();
+      return;
+    }
+    if (!select || !select.value) {
+      setMessage('adminMensaje', 'Selecciona un cliente para cargar su plantilla.', true);
+      return;
+    }
+    if (target) target.innerHTML = '<p class="muted">Cargando puntos...</p>';
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          if (target) target.innerHTML = '<p class="message error">' + esc(res && res.mensaje ? res.mensaje : 'No se pudieron cargar puntos.') + '</p>';
+          return;
+        }
+        window.portalAdminPuntosCliente = res.puntos || [];
+        renderPlantillaPuntosAdmin();
+        llenarOpcionesPlantillaPuntos();
+      })
+      .withFailureHandler(function(error) {
+        if (target) target.innerHTML = '<p class="message error">' + esc(error.message || String(error)) + '</p>';
+      })
+      .listarPuntosClienteAdmin(select.value, token);
+  }
+
+  function renderPlantillaPuntosAdmin() {
+    const target = document.getElementById('plantillaPuntosLista');
+    if (!target) return;
+    const puntos = window.portalAdminPuntosCliente || [];
+    if (!puntos.length) {
+      target.innerHTML = '<p class="muted">Este cliente todavia no tiene puntos cargados.</p>';
+      return;
+    }
+    target.innerHTML = puntos.map(function(punto) {
+      const activo = String(punto.activo || '').toUpperCase() === 'SI';
+      return '<article class="item point-template-card">' +
+        '<div class="visibility-item"><div>' +
+        '<strong>' + esc(punto.puntoControl || 'Punto sin nombre') + '</strong>' +
+        '<small>' + esc([punto.sector, punto.tipoPunto].filter(Boolean).join(' - ')) + '</small>' +
+        '<span class="visibility-pill ' + (activo ? 'visibility-si' : 'visibility-no') + '">ACTIVO ' + esc(punto.activo || 'NO') + '</span>' +
+        '</div><div class="edit-actions">' +
+        '<button class="secondary-button" type="button" onclick="editarPuntoClienteAdmin(\'' + esc(punto.idPuntoCliente) + '\')">Editar</button>' +
+        '<button class="secondary-button" type="button" onclick="cambiarActivoPuntoClienteUi(\'' + esc(punto.idPuntoCliente) + '\', \'' + (activo ? 'NO' : 'SI') + '\')">' + (activo ? 'Desactivar' : 'Activar') + '</button>' +
+        '</div></div>' +
+        '<small>Resultado default: ' + esc(punto.resultadoDefault || 'Sin actividad') + '  -  Accion: ' + esc(punto.accionCorrectivaDefault || 'No requiere') + '  -  Orden: ' + esc(String(punto.orden || '')) + '</small>' +
+        (punto.observaciones ? '<p class="muted">' + esc(punto.observaciones) + '</p>' : '') +
+        '</article>';
+    }).join('');
+  }
+
+  function limpiarFormPuntoCliente() {
+    const form = document.getElementById('formPuntoCliente');
+    if (form) {
+      form.reset();
+      if (form.elements.idPuntoCliente) form.elements.idPuntoCliente.value = '';
+      if (form.elements.activo) form.elements.activo.value = 'SI';
+    }
+    const titulo = document.getElementById('tituloFormPuntoCliente');
+    if (titulo) titulo.textContent = 'Agregar punto';
+    llenarOpcionesPlantillaPuntos();
+  }
+
+  function editarPuntoClienteAdmin(idPuntoCliente) {
+    const punto = (window.portalAdminPuntosCliente || []).find(function(item) {
+      return item.idPuntoCliente === idPuntoCliente;
+    });
+    const form = document.getElementById('formPuntoCliente');
+    if (!punto || !form) return;
+    form.elements.idPuntoCliente.value = punto.idPuntoCliente || '';
+    form.elements.sector.value = punto.sector || '';
+    form.elements.puntoControl.value = punto.puntoControl || '';
+    form.elements.tipoPunto.value = punto.tipoPunto || '';
+    form.elements.resultadoDefault.value = punto.resultadoDefault || '';
+    form.elements.accionCorrectivaDefault.value = punto.accionCorrectivaDefault || '';
+    form.elements.orden.value = punto.orden || '';
+    form.elements.observaciones.value = punto.observaciones || '';
+    form.elements.activo.value = String(punto.activo || 'SI').toUpperCase() === 'NO' ? 'NO' : 'SI';
+    const titulo = document.getElementById('tituloFormPuntoCliente');
+    if (titulo) titulo.textContent = 'Editar punto';
+  }
+
+  function guardarPuntoClienteAdminUi(event) {
+    event.preventDefault();
+    const token = obtenerAdminToken();
+    const clienteSelect = document.getElementById('selectClientePlantillaPuntos');
+    const form = event.target;
+    if (!token) {
+      setMessage('adminMensaje', 'Primero ingresa con PIN admin.', true);
+      mostrarLoginAdmin();
+      return;
+    }
+    if (!clienteSelect || !clienteSelect.value) {
+      setMessage('adminMensaje', 'Selecciona un cliente antes de guardar puntos.', true);
+      return;
+    }
+
+    const data = formToObject(form);
+    data.idPortalCliente = clienteSelect.value;
+    const idPunto = data.idPuntoCliente || '';
+    delete data.idPuntoCliente;
+    setMessage('adminMensaje', idPunto ? 'Actualizando punto...' : 'Guardando punto...');
+
+    const runner = google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          setMessage('adminMensaje', res && res.mensaje ? res.mensaje : 'No se pudo guardar el punto.', true);
+          return;
+        }
+        setMessage('adminMensaje', res.mensaje || 'Punto guardado.');
+        limpiarFormPuntoCliente();
+        cargarPlantillaPuntosAdmin();
+      })
+      .withFailureHandler(function(error) {
+        setMessage('adminMensaje', error.message || String(error), true);
+      });
+
+    if (idPunto) {
+      runner.actualizarPuntoClienteAdmin(idPunto, data, token);
+    } else {
+      runner.crearPuntoClienteAdmin(data, token);
+    }
+  }
+
+  function cambiarActivoPuntoClienteUi(idPuntoCliente, activo) {
+    const token = obtenerAdminToken();
+    if (!token) {
+      setMessage('adminMensaje', 'Primero ingresa con PIN admin.', true);
+      mostrarLoginAdmin();
+      return;
+    }
+    if (!confirm('Cambiar ACTIVO a ' + activo + '?')) return;
+    setMessage('adminMensaje', 'Actualizando punto...');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          setMessage('adminMensaje', res && res.mensaje ? res.mensaje : 'No se pudo actualizar el punto.', true);
+          return;
+        }
+        setMessage('adminMensaje', res.mensaje || 'Punto actualizado.');
+        cargarPlantillaPuntosAdmin();
+      })
+      .withFailureHandler(function(error) {
+        setMessage('adminMensaje', error.message || String(error), true);
+      })
+      .cambiarActivoPuntoClienteAdmin(idPuntoCliente, activo, token);
+  }
+
+  function cargarPuntosClienteEnVisitaRapida() {
+    const token = obtenerAdminToken();
+    const form = document.getElementById('formVisitaRapida');
+    if (!token) {
+      setMessage('adminMensaje', 'Primero ingresa con PIN admin.', true);
+      mostrarLoginAdmin();
+      return;
+    }
+    if (!form || !form.elements.idPortalCliente || !form.elements.idPortalCliente.value) {
+      setMessage('adminMensaje', 'Selecciona un cliente antes de cargar sus puntos.', true);
+      return;
+    }
+    const existentes = document.querySelectorAll('#visitaRapidaPuntos .visita-punto').length;
+    if (existentes && !confirm('Esto reemplazara los puntos ya cargados en el formulario. Continuar?')) return;
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          setMessage('adminMensaje', res && res.mensaje ? res.mensaje : 'No se pudieron cargar puntos del cliente.', true);
+          return;
+        }
+        const puntos = res.puntos || [];
+        const target = document.getElementById('visitaRapidaPuntos');
+        if (target) target.innerHTML = '';
+        window.portalVisitaRapidaPuntos = 0;
+        if (form.elements.incluyePuntos) form.elements.incluyePuntos.value = 'SI';
+        puntos.forEach(function(punto) {
+          agregarPuntoVisitaRapida({
+            sector: punto.sector,
+            puntoControl: punto.puntoControl,
+            tipoPunto: punto.tipoPunto,
+            resultado: punto.resultadoDefault || 'Sin actividad',
+            accionCorrectiva: punto.accionCorrectivaDefault || 'No requiere',
+            novedad: '',
+            observaciones: punto.observaciones || ''
+          });
+        });
+        actualizarModoPuntosVisitaRapida();
+        actualizarPreviewVisitaRapida();
+        setMessage('adminMensaje', puntos.length ? 'Puntos activos cargados: ' + puntos.length + '.' : 'El cliente no tiene puntos activos cargados.');
+      })
+      .withFailureHandler(function(error) {
+        setMessage('adminMensaje', error.message || String(error), true);
+      })
+      .listarPuntosActivosClienteAdmin(form.elements.idPortalCliente.value, token);
+  }
+
   function cargarClientesAdmin() {
     const target = document.getElementById('adminClientesLista');
     if (!target) return;
@@ -741,7 +1048,7 @@
 
   function actualizarSelectsClientesAdmin() {
     const clientes = window.portalAdminClientes || [];
-    const ids = ['selectClienteUsuario', 'selectClientePublicacion', 'selectClienteMonitoreo', 'selectClienteDocumento', 'selectClienteVista', 'selectClienteVisibilidad', 'selectClienteEdicion', 'selectClienteVisitaRapida'];
+    const ids = ['selectClienteUsuario', 'selectClientePublicacion', 'selectClienteMonitoreo', 'selectClienteDocumento', 'selectClienteVista', 'selectClienteVisibilidad', 'selectClienteEdicion', 'selectClienteVisitaRapida', 'selectClientePlantillaPuntos'];
     ids.forEach(function(id) {
       const select = document.getElementById(id);
       if (!select) return;
@@ -749,13 +1056,13 @@
       select.innerHTML = '';
 
       if (!clientes.length) {
-        select.appendChild(crearOption('', 'No hay clientes cargados. Primero cargá un cliente.'));
+        select.appendChild(crearOption('', 'No hay clientes cargados. Primero carga un cliente.'));
         select.disabled = true;
         return;
       }
 
       select.disabled = false;
-      select.appendChild(crearOption('', 'Seleccioná un cliente'));
+      select.appendChild(crearOption('', 'Selecciona un cliente'));
       clientes.forEach(function(cliente) {
         select.appendChild(crearOption(cliente.idPortalCliente, textoClienteAdmin(cliente)));
       });
@@ -810,13 +1117,7 @@
   }
 
   function renderVistaClienteAdmin(data) {
-    const cliente = data.cliente || {};
-    return [
-      renderVistaClienteDatos(cliente),
-      renderVistaClientePublicaciones(data.publicaciones || []),
-      renderVistaClienteMonitoreos(data.monitoreos || []),
-      renderVistaClienteDocumentos(data.documentos || [])
-    ].join('');
+    return renderVistaClienteAdminAgrupadaUi_(data || {});
   }
 
   function renderVistaClienteDatos(cliente) {
@@ -830,11 +1131,11 @@
 
   function renderVistaClientePublicaciones(publicaciones) {
     if (!publicaciones.length) {
-      return '<article class="panel"><h3>Publicaciones visibles</h3><p class="muted">Sin publicaciones visibles.</p></article>';
+      return '<article class="panel"><h3>Servicios publicados</h3><p class="muted">Sin servicios publicados.</p></article>';
     }
 
-    return '<article class="panel"><h3>Publicaciones visibles</h3><div class="list">' + publicaciones.map(function(item) {
-      const meta = [item.fechaVisita, item.tipoServicio, item.sucursal].filter(Boolean).join(' — ');
+    return '<article class="panel"><h3>Servicios publicados</h3><div class="list">' + publicaciones.map(function(item) {
+      const meta = [item.fechaVisita, item.tipoServicio, item.sucursal].filter(Boolean).join(' - ');
       return '<div class="item"><strong>' + esc(item.titulo || 'Publicacion') + '</strong><small>' +
         esc(meta || item.categoria || '') + '</small><p>' + esc(item.resumenCliente || item.contenido || '') +
         '</p></div>';
@@ -843,11 +1144,11 @@
 
   function renderVistaClienteMonitoreos(monitoreos) {
     if (!monitoreos.length) {
-      return '<article class="panel"><h3>Monitoreos visibles</h3><p class="muted">Sin monitoreos visibles.</p></article>';
+      return '<article class="panel"><h3>Puntos de monitoreo</h3><p class="muted">Sin puntos de monitoreo.</p></article>';
     }
 
-    return '<article class="panel"><h3>Monitoreos visibles</h3><div class="list">' + monitoreos.map(function(item) {
-      const meta = [item.fecha, item.sector, item.puntoControl, item.tipo].filter(Boolean).join(' — ');
+    return '<article class="panel"><h3>Puntos de monitoreo</h3><div class="list">' + monitoreos.map(function(item) {
+      const meta = [item.fecha, item.sector, item.puntoControl, item.tipo].filter(Boolean).join(' - ');
       return '<div class="item"><strong>' + esc(meta || 'Monitoreo') + '</strong><p>' +
         esc(item.resultado || '') + '</p><small>' + esc([item.novedad, item.accionCorrectiva, item.observaciones].filter(Boolean).join(' - ')) +
         '</small></div>';
@@ -856,10 +1157,10 @@
 
   function renderVistaClienteDocumentos(documentos) {
     if (!documentos.length) {
-      return '<article class="panel"><h3>Documentos visibles</h3><p class="muted">Sin documentos visibles.</p></article>';
+      return '<article class="panel"><h3>Documentos del cliente</h3><p class="muted">Sin documentos del cliente.</p></article>';
     }
 
-    return '<article class="panel"><h3>Documentos visibles</h3><div class="list">' + documentos.map(function(item) {
+    return '<article class="panel"><h3>Documentos del cliente</h3><div class="list">' + documentos.map(function(item) {
       const link = item.url
         ? '<a class="doc-link" href="' + esc(item.url) + '" target="_blank" rel="noopener">Abrir documento</a>'
         : '<small>Sin URL disponible</small>';
@@ -1189,7 +1490,7 @@
     if (permiteVacio) {
       publicacionSelect.appendChild(crearOption('', 'Documento general del cliente'));
     } else {
-      publicacionSelect.appendChild(crearOption('', idCliente ? 'Seleccioná una publicacion' : 'Seleccioná un cliente primero'));
+      publicacionSelect.appendChild(crearOption('', idCliente ? 'Selecciona una publicacion' : 'Selecciona un cliente primero'));
     }
 
     if (!idCliente) {
@@ -1232,7 +1533,7 @@
 
   function textoClienteAdmin(cliente) {
     const nombre = cliente.razonSocial || cliente.nombreFantasia || 'Cliente sin nombre';
-    return nombre + ' — CUIT ' + (cliente.cuit || 'sin CUIT') + ' — ' + cliente.idPortalCliente;
+    return nombre + ' - CUIT ' + (cliente.cuit || 'sin CUIT') + ' - ' + cliente.idPortalCliente;
   }
 
   function textoPublicacionAdmin(publicacion) {
@@ -1241,7 +1542,7 @@
       publicacion.tipoServicio || publicacion.titulo || 'Sin tipo',
       publicacion.sucursal || 'Sin sucursal',
       publicacion.idPublicacion
-    ].join(' — ');
+    ].join(' - ');
   }
 
   function crearOption(value, text) {
@@ -1305,4 +1606,696 @@
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
   }
+
+/**
+ * Reemplaza la carga clasica del portal cliente por panel agrupado por visita.
+ * Mantiene login y sesion actual.
+ */
+function iniciarPortalCliente() {
+  var sesion = obtenerSesionClienteActualUi_();
+
+  if (!sesion) {
+    mostrarLoginCliente();
+    return;
+  }
+
+  var nombreCliente = obtenerValorFlexibleUi_(sesion, [
+    'nombreFantasia',
+    'NOMBRE_FANTASIA',
+    'razonSocial',
+    'RAZON_SOCIAL',
+    'cliente',
+    'nombre'
+  ]);
+
+  var cuitCliente = obtenerValorFlexibleUi_(sesion, [
+    'cuit',
+    'CUIT'
+  ]);
+
+  var emailCliente = obtenerValorFlexibleUi_(sesion, [
+    'email',
+    'EMAIL'
+  ]);
+
+  var clienteNombre = document.getElementById('clienteNombre');
+  if (clienteNombre) {
+    clienteNombre.textContent = nombreCliente || 'Portal Cliente';
+  }
+
+  var clienteDetalle = document.getElementById('clienteDetalle');
+  if (clienteDetalle) {
+    var detalle = [];
+    if (cuitCliente) detalle.push('CUIT: ' + cuitCliente);
+    if (emailCliente) detalle.push(emailCliente);
+    clienteDetalle.textContent = detalle.join('  -  ');
+  }
+
+  cargarPanelClienteAgrupadoUi();
+}
+
+function cargarPanelClienteAgrupadoUi() {
+  var sesion = obtenerSesionClienteActualUi_();
+  var contenedor = document.getElementById('listaPublicaciones');
+
+  limpiarBloquesClasicosClienteUi_();
+
+  if (!contenedor) {
+    mostrarMensajeClientePanelUi_('No se encontro el contenedor principal del panel.', true);
+    return;
+  }
+
+  if (!sesion) {
+    mostrarLoginCliente();
+    return;
+  }
+
+  var idPortalCliente = obtenerValorFlexibleUi_(sesion, [
+    'idPortalCliente',
+    'ID_PORTAL_CLIENTE',
+    'idCliente',
+    'clienteId'
+  ]);
+
+  var token = obtenerValorFlexibleUi_(sesion, [
+    'token',
+    'TOKEN',
+    'sessionToken'
+  ]);
+
+  if (!idPortalCliente || !token) {
+    contenedor.innerHTML = '<div class="empty-state">La sesion del cliente no es valida. Cerra sesion e ingresa nuevamente.</div>';
+    return;
+  }
+
+  contenedor.innerHTML = '<div class="loading-card">Cargando panel de servicios...</div>';
+
+  google.script.run
+    .withSuccessHandler(function (data) {
+      renderPanelClienteAgrupadoUi(data);
+    })
+    .withFailureHandler(function (err) {
+      var mensaje = err && err.message ? err.message : String(err || 'Error desconocido');
+      contenedor.innerHTML = '<div class="error-card">No se pudo cargar el panel del cliente: ' + escaparHtmlClienteUi_(mensaje) + '</div>';
+    })
+    .obtenerPanelClienteAgrupado(idPortalCliente, token);
+}
+
+function renderPanelClienteAgrupadoUi(data) {
+  renderPanelClienteAgrupadoLimpioUi_(data, 'listaPublicaciones');
+}
+
+function renderResumenClienteVisualUi_(resumen) {
+  var porcentaje = resumen.porcentajeGeneralSinActividad;
+
+  return '' +
+    '<section class="cliente-dashboard-resumen">' +
+      '<div class="cliente-resumen-card">' +
+        '<span class="cliente-resumen-label">Visitas publicadas</span>' +
+        '<strong>' + escaparHtmlClienteUi_(resumen.totalVisitas || 0) + '</strong>' +
+      '</div>' +
+      '<div class="cliente-resumen-card">' +
+        '<span class="cliente-resumen-label">Ultima visita</span>' +
+        '<strong>' + escaparHtmlClienteUi_(formatearFechaClienteUi_(resumen.ultimaVisita) || '-') + '</strong>' +
+      '</div>' +
+      '<div class="cliente-resumen-card">' +
+        '<span class="cliente-resumen-label">Puntos controlados</span>' +
+        '<strong>' + escaparHtmlClienteUi_(resumen.totalPuntos || 0) + '</strong>' +
+      '</div>' +
+      '<div class="cliente-resumen-card">' +
+        '<span class="cliente-resumen-label">Sin actividad</span>' +
+        '<strong>' + (porcentaje === null || porcentaje === undefined ? '-' : escaparHtmlClienteUi_(porcentaje + '%')) + '</strong>' +
+      '</div>' +
+    '</section>';
+}
+
+function renderTarjetaVisitaClienteUi_(visita, index) {
+  var indicadores = visita.indicadores || {};
+  var porcentajeControl = indicadores.porcentajeControl;
+  var estado = indicadores.estadoVisual || 'Servicio registrado';
+  var estadoClase = obtenerClaseEstadoVisitaClienteUi_(estado);
+  var detalleId = 'detalle-visita-cliente-' + index;
+
+  return '' +
+    '<article class="visita-cliente-card">' +
+      '<button type="button" class="visita-cliente-header" onclick="toggleDetalleVisitaClienteUi(\'' + detalleId + '\')">' +
+        '<div class="visita-cliente-main">' +
+          '<span class="visita-cliente-fecha">' + escaparHtmlClienteUi_(formatearFechaClienteUi_(visita.fechaVisita) || '-') + '</span>' +
+          '<strong class="visita-cliente-titulo">' + escaparHtmlClienteUi_(visita.titulo || visita.tipoServicio || 'Servicio realizado') + '</strong>' +
+          '<span class="visita-cliente-subtitulo">' +
+            escaparHtmlClienteUi_(visita.tipoServicio || 'Servicio') +
+            (visita.sucursal ? '  -  ' + escaparHtmlClienteUi_(visita.sucursal) : '') +
+          '</span>' +
+        '</div>' +
+        '<div class="visita-cliente-metricas">' +
+          '<span class="estado-visita-badge ' + estadoClase + '">' + escaparHtmlClienteUi_(estado) + '</span>' +
+          renderMiniProgresoClienteUi_(porcentajeControl) +
+          '<span class="visita-cliente-puntos">' +
+            escaparHtmlClienteUi_(indicadores.puntosControlados || 0) + '/' + escaparHtmlClienteUi_(indicadores.totalPuntos || 0) + ' puntos' +
+          '</span>' +
+          '<span class="visita-cliente-toggle">Ver detalle</span>' +
+        '</div>' +
+      '</button>' +
+      '<div id="' + detalleId + '" class="visita-cliente-detalle" style="display:none;">' +
+        renderDetalleServicioClienteUi_(visita) +
+        renderMonitoreosVisitaClienteUi_(visita.monitoreos || []) +
+        renderDocumentosVisitaClienteUi_(visita.documentos || []) +
+      '</div>' +
+    '</article>';
+}
+
+function renderDetalleServicioClienteUi_(visita) {
+  return '' +
+    '<div class="detalle-grid-cliente">' +
+      '<section class="detalle-bloque-cliente">' +
+        '<h4>Servicio realizado</h4>' +
+        '<p><strong>Fecha:</strong> ' + escaparHtmlClienteUi_(formatearFechaClienteUi_(visita.fechaVisita) || '-') + '</p>' +
+        '<p><strong>Servicio:</strong> ' + escaparHtmlClienteUi_(visita.tipoServicio || '-') + '</p>' +
+        '<p><strong>Categoria:</strong> ' + escaparHtmlClienteUi_(visita.categoria || '-') + '</p>' +
+        '<p><strong>Sucursal/Sector:</strong> ' + escaparHtmlClienteUi_(visita.sucursal || '-') + '</p>' +
+      '</section>' +
+      '<section class="detalle-bloque-cliente">' +
+        '<h4>Informe para el cliente</h4>' +
+        '<p><strong>Resumen:</strong> ' + escaparHtmlClienteUi_(visita.resumenCliente || 'Sin resumen informado.') + '</p>' +
+        '<p>' + textoMultilineaClienteUi_(visita.contenido || 'Sin detalle adicional informado.') + '</p>' +
+      '</section>' +
+    '</div>';
+}
+
+function renderMonitoreosVisitaClienteUi_(monitoreos) {
+  if (!monitoreos.length) {
+    return '<section class="detalle-bloque-cliente"><h4>Puntos controlados</h4><div class="empty-state small">Esta visita no tiene puntos de monitoreo asociados.</div></section>';
+  }
+
+  var html = '<section class="detalle-bloque-cliente"><h4>Puntos controlados</h4>';
+  html += '<div class="puntos-cliente-grid">';
+
+  monitoreos.forEach(function (mon) {
+    var resultadoClase = obtenerClaseResultadoPuntoClienteUi_(mon.resultado);
+
+    html += '' +
+      '<div class="punto-cliente-card">' +
+        '<div class="punto-cliente-head">' +
+          '<strong>' + escaparHtmlClienteUi_(mon.puntoControl || 'Punto') + '</strong>' +
+          '<span class="resultado-punto-badge ' + resultadoClase + '">' + escaparHtmlClienteUi_(mon.resultado || '-') + '</span>' +
+        '</div>' +
+        '<p><strong>Sector:</strong> ' + escaparHtmlClienteUi_(mon.sector || '-') + '</p>' +
+        '<p><strong>Tipo:</strong> ' + escaparHtmlClienteUi_(mon.tipo || '-') + '</p>' +
+        '<p><strong>Novedad:</strong> ' + escaparHtmlClienteUi_(mon.novedad || 'Sin novedades') + '</p>' +
+        '<p><strong>Accion correctiva:</strong> ' + escaparHtmlClienteUi_(mon.accionCorrectiva || 'No requiere') + '</p>' +
+        (mon.observaciones ? '<p><strong>Observaciones:</strong> ' + escaparHtmlClienteUi_(mon.observaciones) + '</p>' : '') +
+      '</div>';
+  });
+
+  html += '</div></section>';
+  return html;
+}
+
+function renderDocumentosVisitaClienteUi_(documentos) {
+  if (!documentos.length) {
+    return '<section class="detalle-bloque-cliente"><h4>Documentos</h4><div class="empty-state small">Sin documentos asociados a esta visita.</div></section>';
+  }
+
+  var html = '<section class="detalle-bloque-cliente"><h4>Documentos</h4>';
+  html += '<div class="documentos-cliente-lista">';
+
+  documentos.forEach(function (doc) {
+    html += '' +
+      '<div class="documento-cliente-item">' +
+        '<div>' +
+          '<strong>' + escaparHtmlClienteUi_(doc.titulo || 'Documento') + '</strong>' +
+          '<span>' + escaparHtmlClienteUi_(doc.tipo || '') + '</span>' +
+          (doc.descripcion ? '<p>' + escaparHtmlClienteUi_(doc.descripcion) + '</p>' : '') +
+        '</div>' +
+        (doc.url ? '<a class="btn-documento-cliente" href="' + escaparAtributoClienteUi_(doc.url) + '" target="_blank" rel="noopener">Abrir documento</a>' : '') +
+      '</div>';
+  });
+
+  html += '</div></section>';
+  return html;
+}
+
+function renderDocumentosGeneralesClienteUi_(documentos) {
+  var html = '<section class="documentos-generales-cliente"><h3>Documentos generales</h3>';
+
+  documentos.forEach(function (doc) {
+    html += '' +
+      '<div class="documento-cliente-item">' +
+        '<div>' +
+          '<strong>' + escaparHtmlClienteUi_(doc.titulo || 'Documento') + '</strong>' +
+          '<span>' + escaparHtmlClienteUi_(doc.tipo || '') + '</span>' +
+        '</div>' +
+        (doc.url ? '<a class="btn-documento-cliente" href="' + escaparAtributoClienteUi_(doc.url) + '" target="_blank" rel="noopener">Abrir documento</a>' : '') +
+      '</div>';
+  });
+
+  html += '</section>';
+  return html;
+}
+
+function renderMiniProgresoClienteUi_(porcentaje) {
+  if (porcentaje === null || porcentaje === undefined) {
+    return '<div class="mini-progreso-cliente sin-datos"><span>Sin puntos de control</span></div>';
+  }
+
+  var valor = Math.max(0, Math.min(100, Number(porcentaje) || 0));
+
+  return '' +
+    '<div class="mini-progreso-cliente">' +
+      '<div class="mini-progreso-barra">' +
+        '<div class="mini-progreso-fill" style="width:' + valor + '%;"></div>' +
+      '</div>' +
+      '<span>Control realizado: ' + valor + '%</span>' +
+    '</div>';
+}
+
+function toggleDetalleVisitaClienteUi(id) {
+  var detalle = document.getElementById(id);
+  if (!detalle) return;
+
+  detalle.style.display = detalle.style.display === 'none' || !detalle.style.display
+    ? 'block'
+    : 'none';
+}
+
+function obtenerSesionClienteActualUi_() {
+  if (window.portalSession) {
+    return window.portalSession;
+  }
+
+  try {
+    var guardada = sessionStorage.getItem('portalCliente');
+    if (guardada) {
+      window.portalSession = JSON.parse(guardada);
+      return window.portalSession;
+    }
+  } catch (err) {
+    console.error('No se pudo leer la sesion del cliente', err);
+  }
+
+  return null;
+}
+
+function limpiarBloquesClasicosClienteUi_() {
+  ocultarBloqueClienteClasicoUi_('listaMonitoreos');
+  ocultarBloqueClienteClasicoUi_('listaDocumentos');
+}
+
+function mostrarMensajeClientePanelUi_(mensaje, esError) {
+  var contenedor = document.getElementById('listaPublicaciones');
+  if (!contenedor) return;
+
+  contenedor.innerHTML = '<div class="' + (esError ? 'error-card' : 'empty-state') + '">' + escaparHtmlClienteUi_(mensaje) + '</div>';
+}
+
+function obtenerValorFlexibleUi_(obj, claves) {
+  if (!obj || !claves) return '';
+
+  for (var i = 0; i < claves.length; i++) {
+    var clave = claves[i];
+
+    if (Object.prototype.hasOwnProperty.call(obj, clave)) {
+      return obj[clave];
+    }
+
+    var reales = Object.keys(obj);
+    for (var j = 0; j < reales.length; j++) {
+      if (String(reales[j]).toUpperCase() === String(clave).toUpperCase()) {
+        return obj[reales[j]];
+      }
+    }
+  }
+
+  return '';
+}
+
+function obtenerClaseEstadoVisitaClienteUi_(estado) {
+  var normalizado = normalizarTextoClienteUi_(estado);
+
+  if (normalizado === 'sin desvios') return 'estado-ok';
+  if (normalizado === 'con novedades') return 'estado-alerta';
+
+  return 'estado-neutral';
+}
+
+function obtenerClaseResultadoPuntoClienteUi_(resultado) {
+  var normalizado = normalizarTextoClienteUi_(resultado);
+
+  if (normalizado === 'sin actividad') return 'resultado-ok';
+  if (!normalizado || normalizado === 'no inspeccionada') return 'resultado-neutral';
+
+  return 'resultado-alerta';
+}
+
+function normalizarTextoClienteUi_(texto) {
+  return String(texto || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function formatearFechaClienteUi_(fecha) {
+  if (!fecha) return '';
+
+  if (Object.prototype.toString.call(fecha) === '[object Date]') {
+    return fecha.toLocaleDateString('es-AR');
+  }
+
+  var texto = String(fecha).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(texto)) {
+    var partesIso = texto.substring(0, 10).split('-');
+    return partesIso[2] + '/' + partesIso[1] + '/' + partesIso[0];
+  }
+
+  return texto;
+}
+
+function textoMultilineaClienteUi_(texto) {
+  return escaparHtmlClienteUi_(texto).replace(/\n/g, '<br>');
+}
+
+function escaparHtmlClienteUi_(valor) {
+  return String(valor === null || valor === undefined ? '' : valor)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function escaparAtributoClienteUi_(valor) {
+  return escaparHtmlClienteUi_(valor).replace(/`/g, '&#096;');
+}
+function renderPanelClienteAgrupadoLimpioUi_(data, targetId) {
+  var contenedor = document.getElementById(targetId || 'listaPublicaciones');
+  if (!contenedor) return;
+
+  if (!data || data.ok === false) {
+    contenedor.innerHTML = '<div class="error-card">No se pudo cargar la informacion del portal.</div>';
+    return;
+  }
+
+  var resumen = data.resumen || {};
+  var visitas = Array.isArray(data.visitas) ? data.visitas : [];
+  var documentosGenerales = Array.isArray(data.documentosGenerales) ? data.documentosGenerales : [];
+  var html = renderResumenClienteVisualLimpioUi_(resumen);
+
+  if (!visitas.length) {
+    html += '<div class="empty-state">Todavia no hay visitas publicadas para este cliente.</div>';
+  } else {
+    html += '<div class="visitas-cliente-lista">';
+    visitas.forEach(function(visita, index) {
+      html += renderTarjetaVisitaClienteLimpiaUi_(visita, index, targetId || 'cliente');
+    });
+    html += '</div>';
+  }
+
+  if (documentosGenerales.length) {
+    html += renderDocumentosGeneralesClienteLimpiosUi_(documentosGenerales);
+  }
+
+  contenedor.innerHTML = html;
+}
+
+function renderVistaClienteAdminAgrupadaUi_(data) {
+  var cliente = data && data.cliente ? data.cliente : {};
+  var panelData = construirPanelAgrupadoDesdeVistaAdminUi_(data || {});
+  return renderVistaClienteDatosLimpioUi_(cliente) + '<article class="panel cliente-panel-servicios"><h3>Vista del cliente</h3>' + renderPanelAgrupadoHtmlLimpioUi_(panelData, 'admin') + '</article>';
+}
+
+function construirPanelAgrupadoDesdeVistaAdminUi_(data) {
+  var publicaciones = data.publicaciones || [];
+  var monitoreos = data.monitoreos || [];
+  var documentos = data.documentos || [];
+  var monitoreosPorPublicacion = agruparItemsClienteUi_(monitoreos, 'idPublicacion');
+  var documentosPorPublicacion = agruparItemsClienteUi_(documentos, 'idPublicacion');
+  var documentosGenerales = documentos.filter(function(doc) { return !doc.idPublicacion; });
+
+  var visitas = publicaciones.map(function(pub) {
+    var idPublicacion = pub.idPublicacion || '';
+    var puntos = (monitoreosPorPublicacion[idPublicacion] || []).map(function(mon) {
+      return {
+        fecha: mon.fecha,
+        sector: mon.sector,
+        puntoControl: mon.puntoControl,
+        tipo: mon.tipo,
+        resultado: mon.resultado,
+        novedad: mon.novedad,
+        accionCorrectiva: mon.accionCorrectiva,
+        observaciones: mon.observaciones
+      };
+    });
+
+    return {
+      idPublicacion: idPublicacion,
+      fechaVisita: pub.fechaVisita,
+      sucursal: pub.sucursal,
+      tipoServicio: pub.tipoServicio,
+      titulo: pub.titulo,
+      categoria: pub.categoria,
+      resumenCliente: pub.resumenCliente,
+      contenido: pub.contenido,
+      indicadores: calcularIndicadoresClienteUi_(puntos),
+      monitoreos: puntos,
+      documentos: (documentosPorPublicacion[idPublicacion] || []).map(normalizarDocumentoClienteUi_)
+    };
+  });
+
+  visitas.sort(function(a, b) {
+    return obtenerFechaOrdenClienteUi_(b.fechaVisita) - obtenerFechaOrdenClienteUi_(a.fechaVisita);
+  });
+
+  return {
+    ok: true,
+    resumen: calcularResumenClienteUi_(visitas, documentos),
+    visitas: visitas,
+    documentosGenerales: documentosGenerales.map(normalizarDocumentoClienteUi_)
+  };
+}
+
+function renderPanelAgrupadoHtmlLimpioUi_(data, contexto) {
+  var resumen = data.resumen || {};
+  var visitas = Array.isArray(data.visitas) ? data.visitas : [];
+  var documentosGenerales = Array.isArray(data.documentosGenerales) ? data.documentosGenerales : [];
+  var html = renderResumenClienteVisualLimpioUi_(resumen);
+
+  if (!visitas.length) {
+    html += '<div class="empty-state">Todavia no hay visitas publicadas para este cliente.</div>';
+  } else {
+    html += '<div class="visitas-cliente-lista">';
+    visitas.forEach(function(visita, index) {
+      html += renderTarjetaVisitaClienteLimpiaUi_(visita, index, contexto || 'admin');
+    });
+    html += '</div>';
+  }
+
+  if (documentosGenerales.length) {
+    html += renderDocumentosGeneralesClienteLimpiosUi_(documentosGenerales);
+  }
+
+  return html;
+}
+
+function renderVistaClienteDatosLimpioUi_(cliente) {
+  var nombre = cliente.razonSocial || cliente.nombreFantasia || 'Cliente';
+  return '<article class="panel"><span class="eyebrow">Cliente</span><h3>' + esc(nombre) +
+    '</h3><p><strong>CUIT:</strong> ' + esc(cliente.cuit || '') + '</p><p><strong>Email:</strong> ' +
+    esc(cliente.emailPrincipal || '') + '</p><p><strong>Telefono:</strong> ' + esc(cliente.telefono || '') +
+    '</p><p><strong>Direccion:</strong> ' + esc(cliente.direccion || '') + '</p></article>';
+}
+
+function renderResumenClienteVisualLimpioUi_(resumen) {
+  var porcentaje = resumen.porcentajeGeneralSinActividad;
+  return '<section class="cliente-dashboard-resumen">' +
+    '<div class="cliente-resumen-card"><span class="cliente-resumen-label">Visitas publicadas</span><strong>' + escaparHtmlClienteUi_(resumen.totalVisitas || 0) + '</strong></div>' +
+    '<div class="cliente-resumen-card"><span class="cliente-resumen-label">Ultima visita</span><strong>' + escaparHtmlClienteUi_(formatearFechaClienteUi_(resumen.ultimaVisita) || '-') + '</strong></div>' +
+    '<div class="cliente-resumen-card"><span class="cliente-resumen-label">Puntos controlados</span><strong>' + escaparHtmlClienteUi_(resumen.totalPuntos || 0) + '</strong></div>' +
+    '<div class="cliente-resumen-card"><span class="cliente-resumen-label">Puntos sin actividad</span><strong>' + (porcentaje === null || porcentaje === undefined ? '-' : escaparHtmlClienteUi_(porcentaje + '%')) + '</strong></div>' +
+    '<div class="cliente-resumen-card"><span class="cliente-resumen-label">Con novedades</span><strong>' + escaparHtmlClienteUi_(resumen.totalPuntosConNovedad || 0) + '</strong></div>' +
+    '</section>';
+}
+
+function renderTarjetaVisitaClienteLimpiaUi_(visita, index, contexto) {
+  var indicadores = visita.indicadores || {};
+  var estado = indicadores.estadoVisual || 'Servicio registrado';
+  var detalleId = 'detalle-visita-' + (contexto || 'cliente') + '-' + index;
+  var puntosTexto = (indicadores.totalPuntos || 0) > 0
+    ? escaparHtmlClienteUi_(indicadores.puntosControlados || 0) + '/' + escaparHtmlClienteUi_(indicadores.totalPuntos || 0) + ' puntos controlados'
+    : 'Sin puntos de control';
+
+  return '<article class="visita-cliente-card">' +
+    '<button type="button" class="visita-cliente-header" onclick="toggleDetalleVisitaClienteUi(\'' + detalleId + '\')">' +
+      '<div class="visita-cliente-main">' +
+        '<span class="visita-cliente-fecha">' + escaparHtmlClienteUi_(formatearFechaClienteUi_(visita.fechaVisita) || '-') + '</span>' +
+        '<strong class="visita-cliente-titulo">' + escaparHtmlClienteUi_(visita.titulo || visita.tipoServicio || 'Servicio realizado') + '</strong>' +
+        '<span class="visita-cliente-subtitulo">' + escaparHtmlClienteUi_([visita.tipoServicio || 'Servicio', visita.sucursal || ''].filter(Boolean).join(' - ')) + '</span>' +
+      '</div>' +
+      '<div class="visita-cliente-metricas">' +
+        '<span class="estado-visita-badge ' + obtenerClaseEstadoVisitaClienteUi_(estado) + '">' + escaparHtmlClienteUi_(estado) + '</span>' +
+        renderMiniProgresoClienteUi_(indicadores.porcentajeControl) +
+        '<span class="visita-cliente-puntos">' + puntosTexto + '</span>' +
+        '<span class="visita-cliente-toggle">Ver detalle</span>' +
+      '</div>' +
+    '</button>' +
+    '<div id="' + detalleId + '" class="visita-cliente-detalle" style="display:none;">' +
+      renderDetalleServicioClienteLimpioUi_(visita) +
+      renderMonitoreosVisitaClienteLimpiosUi_(visita.monitoreos || []) +
+      renderDocumentosVisitaClienteLimpiosUi_(visita.documentos || []) +
+    '</div>' +
+  '</article>';
+}
+
+function renderDetalleServicioClienteLimpioUi_(visita) {
+  return '<div class="detalle-grid-cliente">' +
+    '<section class="detalle-bloque-cliente"><h4>Servicio realizado</h4>' +
+      '<p><strong>Fecha:</strong> ' + escaparHtmlClienteUi_(formatearFechaClienteUi_(visita.fechaVisita) || '-') + '</p>' +
+      '<p><strong>Servicio:</strong> ' + escaparHtmlClienteUi_(visita.tipoServicio || '-') + '</p>' +
+      '<p><strong>Categoria:</strong> ' + escaparHtmlClienteUi_(visita.categoria || '-') + '</p>' +
+      '<p><strong>Sucursal/Sector:</strong> ' + escaparHtmlClienteUi_(visita.sucursal || '-') + '</p>' +
+    '</section>' +
+    '<section class="detalle-bloque-cliente"><h4>Informe para el cliente</h4>' +
+      '<p><strong>Resumen:</strong> ' + escaparHtmlClienteUi_(visita.resumenCliente || 'Sin resumen informado.') + '</p>' +
+      '<p>' + textoMultilineaClienteUi_(visita.contenido || 'Sin detalle adicional informado.') + '</p>' +
+    '</section>' +
+  '</div>';
+}
+
+function renderMonitoreosVisitaClienteLimpiosUi_(monitoreos) {
+  if (!monitoreos.length) {
+    return '<section class="detalle-bloque-cliente"><h4>Puntos controlados</h4><div class="empty-state small">Esta visita no tiene puntos de monitoreo asociados.</div></section>';
+  }
+  var html = '<section class="detalle-bloque-cliente"><h4>Puntos controlados</h4><div class="puntos-cliente-grid">';
+  monitoreos.forEach(function(mon) {
+    html += '<div class="punto-cliente-card"><div class="punto-cliente-head"><strong>' + escaparHtmlClienteUi_(mon.puntoControl || 'Punto') + '</strong>' +
+      '<span class="resultado-punto-badge ' + obtenerClaseResultadoPuntoClienteUi_(mon.resultado) + '">' + escaparHtmlClienteUi_(mon.resultado || '-') + '</span></div>' +
+      '<p><strong>Sector:</strong> ' + escaparHtmlClienteUi_(mon.sector || '-') + '</p>' +
+      '<p><strong>Tipo:</strong> ' + escaparHtmlClienteUi_(mon.tipo || '-') + '</p>' +
+      '<p><strong>Novedad:</strong> ' + escaparHtmlClienteUi_(mon.novedad || 'Sin novedades') + '</p>' +
+      '<p><strong>Accion correctiva:</strong> ' + escaparHtmlClienteUi_(mon.accionCorrectiva || 'No requiere') + '</p>' +
+      (mon.observaciones ? '<p><strong>Observaciones:</strong> ' + escaparHtmlClienteUi_(mon.observaciones) + '</p>' : '') +
+      '</div>';
+  });
+  return html + '</div></section>';
+}
+
+function renderDocumentosVisitaClienteLimpiosUi_(documentos) {
+  if (!documentos.length) {
+    return '<section class="detalle-bloque-cliente"><h4>Documentos</h4><div class="empty-state small">Sin documentos asociados a esta visita.</div></section>';
+  }
+  var html = '<section class="detalle-bloque-cliente"><h4>Documentos</h4><div class="documentos-cliente-lista">';
+  documentos.forEach(function(doc) {
+    html += renderDocumentoClienteItemLimpioUi_(doc);
+  });
+  return html + '</div></section>';
+}
+
+function renderDocumentosGeneralesClienteLimpiosUi_(documentos) {
+  var html = '<section class="documentos-generales-cliente"><h3>Documentos generales</h3>';
+  documentos.forEach(function(doc) {
+    html += renderDocumentoClienteItemLimpioUi_(doc);
+  });
+  return html + '</section>';
+}
+
+function renderDocumentoClienteItemLimpioUi_(doc) {
+  return '<div class="documento-cliente-item"><div><strong>' + escaparHtmlClienteUi_(doc.titulo || 'Documento') + '</strong>' +
+    '<span>' + escaparHtmlClienteUi_(doc.tipo || '') + '</span>' +
+    (doc.descripcion ? '<p>' + escaparHtmlClienteUi_(doc.descripcion) + '</p>' : '') +
+    '</div>' +
+    (doc.url ? '<a class="btn-documento-cliente" href="' + escaparAtributoClienteUi_(doc.url) + '" target="_blank" rel="noopener">Abrir documento</a>' : '') +
+    '</div>';
+}
+
+function agruparItemsClienteUi_(items, campo) {
+  var out = {};
+  (items || []).forEach(function(item) {
+    var clave = item && item[campo] ? String(item[campo]) : '';
+    if (!clave) return;
+    if (!out[clave]) out[clave] = [];
+    out[clave].push(item);
+  });
+  return out;
+}
+
+function normalizarDocumentoClienteUi_(doc) {
+  return {
+    titulo: doc.titulo || doc.TITULO || '',
+    tipo: doc.tipo || doc.TIPO || '',
+    url: doc.url || doc.URL || '',
+    descripcion: doc.descripcion || doc.DESCRIPCION || ''
+  };
+}
+
+function calcularIndicadoresClienteUi_(monitoreos) {
+  var totalPuntos = monitoreos.length;
+  var puntosControlados = 0;
+  var puntosSinActividad = 0;
+  var puntosConNovedad = 0;
+  monitoreos.forEach(function(mon) {
+    var resultadoNorm = normalizarTextoClienteUi_(mon.resultado);
+    var novedadNorm = normalizarTextoClienteUi_(mon.novedad);
+    var controlado = resultadoNorm && resultadoNorm !== 'no inspeccionada';
+    var sinActividad = resultadoNorm === 'sin actividad';
+    var conNovedad = resultadoNorm && resultadoNorm !== 'sin actividad' && resultadoNorm !== 'no inspeccionada';
+    if (novedadNorm && novedadNorm !== 'sin novedades' && novedadNorm !== 'sin novedad' && novedadNorm !== 'no aplica') conNovedad = true;
+    if (controlado) puntosControlados++;
+    if (sinActividad) puntosSinActividad++;
+    if (conNovedad) puntosConNovedad++;
+  });
+  return {
+    totalPuntos: totalPuntos,
+    puntosControlados: puntosControlados,
+    puntosSinActividad: puntosSinActividad,
+    puntosConNovedad: puntosConNovedad,
+    porcentajeControl: totalPuntos ? Math.round((puntosControlados / totalPuntos) * 100) : null,
+    porcentajeSinActividad: totalPuntos ? Math.round((puntosSinActividad / totalPuntos) * 100) : null,
+    estadoVisual: totalPuntos ? (puntosConNovedad ? 'Con novedades' : 'Sin desvios') : 'Servicio registrado'
+  };
+}
+
+function calcularResumenClienteUi_(visitas, documentos) {
+  var totalPuntos = 0;
+  var totalPuntosSinActividad = 0;
+  var totalPuntosConNovedad = 0;
+  visitas.forEach(function(visita) {
+    totalPuntos += visita.indicadores.totalPuntos || 0;
+    totalPuntosSinActividad += visita.indicadores.puntosSinActividad || 0;
+    totalPuntosConNovedad += visita.indicadores.puntosConNovedad || 0;
+  });
+  return {
+    totalVisitas: visitas.length,
+    ultimaVisita: visitas.length ? visitas[0].fechaVisita : '',
+    totalPuntos: totalPuntos,
+    totalPuntosConNovedad: totalPuntosConNovedad,
+    porcentajeGeneralSinActividad: totalPuntos ? Math.round((totalPuntosSinActividad / totalPuntos) * 100) : null,
+    documentosDisponibles: (documentos || []).length
+  };
+}
+
+function obtenerFechaOrdenClienteUi_(fecha) {
+  if (!fecha) return 0;
+  var texto = String(fecha).trim();
+  var iso = new Date(texto);
+  if (!isNaN(iso.getTime())) return iso.getTime();
+  var partes = texto.split(/[\/\-]/);
+  if (partes.length === 3) {
+    var dia = Number(partes[0]);
+    var mes = Number(partes[1]) - 1;
+    var anio = Number(partes[2]);
+    if (anio < 100) anio += 2000;
+    var manual = new Date(anio, mes, dia);
+    if (!isNaN(manual.getTime())) return manual.getTime();
+  }
+  return 0;
+}
+
+function ocultarBloqueClienteClasicoUi_(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = '';
+  var article = el.closest ? el.closest('article') : null;
+  if (article) article.classList.add('hidden');
+}
 </script>

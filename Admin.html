@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta charset="UTF-8">
     <base target="_top">
     <?!= include('Styles'); ?>
   </head>
@@ -57,6 +58,7 @@
           <button type="button" class="admin-tab" data-admin-tab="usuarios" onclick="mostrarAdminTab('usuarios')">Usuarios</button>
           <button type="button" class="admin-tab" data-admin-tab="publicaciones" onclick="mostrarAdminTab('publicaciones')">Visitas/Publicaciones</button>
           <button type="button" class="admin-tab" data-admin-tab="visitaRapida" onclick="mostrarAdminTab('visitaRapida')">Nuevo parte de servicio</button>
+          <button type="button" class="admin-tab" data-admin-tab="plantillaPuntos" onclick="mostrarAdminTab('plantillaPuntos')">Plantilla de puntos</button>
           <button type="button" class="admin-tab" data-admin-tab="monitoreos" onclick="mostrarAdminTab('monitoreos')">Monitoreos avanzado</button>
           <button type="button" class="admin-tab" data-admin-tab="documentos" onclick="mostrarAdminTab('documentos')">Documentos</button>
           <button type="button" class="admin-tab" data-admin-tab="vistaCliente" onclick="mostrarAdminTab('vistaCliente')">Vista cliente</button>
@@ -362,7 +364,10 @@
                     <h3>Puntos controlados</h3>
                     <p class="muted">Carg&aacute; solo los puntos relevados durante la visita.</p>
                   </div>
-                  <button class="secondary-button" type="button" onclick="agregarPuntoVisitaRapida()">Agregar punto</button>
+                  <div class="inline-actions">
+                    <button class="secondary-button" type="button" onclick="cargarPuntosClienteEnVisitaRapida()">Cargar puntos del cliente</button>
+                    <button class="secondary-button" type="button" onclick="agregarPuntoVisitaRapida()">Agregar punto</button>
+                  </div>
                 </div>
                 <div id="visitaRapidaPuntos" class="service-points"></div>
               </div>
@@ -387,6 +392,69 @@
               </div>
             </section>
           </form>
+        </section>
+
+        <section id="adminTab-plantillaPuntos" class="admin-tab-panel hidden">
+          <section class="panel admin-form">
+            <h2>Plantilla de puntos</h2>
+            <p class="muted">Carg&aacute; los puntos/cajas habituales de cada cliente para reutilizarlos en cada parte de servicio.</p>
+            <div class="form-grid">
+              <label>Cliente
+                <select id="selectClientePlantillaPuntos" onchange="limpiarPlantillaPuntosAdmin()">
+                  <option value="">Cargando clientes...</option>
+                </select>
+              </label>
+            </div>
+            <div class="inline-actions">
+              <button class="secondary-button" type="button" onclick="inicializarPuntosClienteAdminUi()">Inicializar plantilla de puntos</button>
+              <button type="button" onclick="cargarPlantillaPuntosAdmin()">Cargar plantilla</button>
+            </div>
+          </section>
+
+          <form id="formPuntoCliente" class="panel admin-form" onsubmit="guardarPuntoClienteAdminUi(event)">
+            <h3 id="tituloFormPuntoCliente">Agregar punto</h3>
+            <input type="hidden" name="idPuntoCliente">
+            <div class="form-grid">
+              <label>Sector
+                <input name="sector" required placeholder="Ej: Dep&oacute;sito, cocina, per&iacute;metro">
+              </label>
+              <label>Punto de control
+                <input name="puntoControl" required placeholder="Ej: Caja 01, trampa norte">
+              </label>
+              <label>Tipo de punto
+                <select id="selectPuntoClienteTipo" name="tipoPunto" data-opciones-grupo="TIPO_PUNTO" data-placeholder="Selecciona tipo de punto" required></select>
+              </label>
+              <label>Resultado default
+                <select id="selectPuntoClienteResultado" name="resultadoDefault" data-opciones-grupo="RESULTADO_MONITOREO" data-placeholder="Selecciona resultado"></select>
+              </label>
+              <label>Acci&oacute;n correctiva default
+                <select id="selectPuntoClienteAccion" name="accionCorrectivaDefault" data-opciones-grupo="ACCION_CORRECTIVA" data-placeholder="Selecciona accion"></select>
+              </label>
+              <label>Orden
+                <input name="orden" type="number" min="1" step="1">
+              </label>
+              <label>Activo
+                <select name="activo">
+                  <option value="SI">SI</option>
+                  <option value="NO">NO</option>
+                </select>
+              </label>
+            </div>
+            <label>Observaciones
+              <textarea name="observaciones"></textarea>
+            </label>
+            <div class="inline-actions">
+              <button class="secondary-button" type="button" onclick="limpiarFormPuntoCliente()">Cancelar / nuevo</button>
+              <button type="submit">Guardar punto</button>
+            </div>
+          </form>
+
+          <section class="panel">
+            <h3>Puntos del cliente</h3>
+            <div id="plantillaPuntosLista" class="list">
+              <p class="muted">Seleccion&aacute; un cliente y carg&aacute; su plantilla.</p>
+            </div>
+          </section>
         </section>
 
         <section id="adminTab-documentos" class="admin-tab-panel hidden">

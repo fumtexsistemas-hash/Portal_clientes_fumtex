@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta charset="UTF-8">
     <base target="_top">
     <?!= include('Styles'); ?>
   </head>
@@ -59,20 +60,20 @@
           <button class="secondary-button" type="button" onclick="cerrarSesionCliente()">Cerrar sesi&oacute;n</button>
         </section>
 
-        <section class="grid-3">
-          <article class="panel">
-            <h3>Publicaciones</h3>
+        <section class="cliente-content">
+          <article class="panel cliente-panel-servicios">
+            <h3>Panel de servicios</h3>
             <div id="listaPublicaciones" class="list">
               <p class="muted">Sin datos publicados.</p>
             </div>
           </article>
-          <article class="panel">
+          <article class="panel hidden">
             <h3>Monitoreos</h3>
             <div id="listaMonitoreos" class="list">
               <p class="muted">Sin datos publicados.</p>
             </div>
           </article>
-          <article class="panel">
+          <article class="panel hidden">
             <h3>Documentos</h3>
             <div id="listaDocumentos" class="list">
               <p class="muted">Sin datos publicados.</p>

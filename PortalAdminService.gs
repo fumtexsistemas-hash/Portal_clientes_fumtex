@@ -269,6 +269,113 @@ function listarPublicacionesPortalAdmin(adminToken) {
   return { ok: true, publicaciones: publicaciones };
 }
 
+function listarPuntosClienteAdmin(idPortalCliente, adminToken) {
+  validarAdminToken_(adminToken);
+  const id = normalizarTexto_(idPortalCliente);
+  if (!id) throw new Error('Falta seleccionar un cliente.');
+
+  const puntos = leerPuntosCliente_(id, false);
+  return {
+    ok: true,
+    puntos: puntos
+  };
+}
+
+function inicializarPuntosClienteAdmin(adminToken) {
+  const usuario = validarAdminToken_(adminToken);
+  const ss = abrirPortalSS_();
+  const nombreHoja = PORTAL_CONFIG.HOJAS.PUNTOS_CLIENTE;
+  const headers = PORTAL_CONFIG.HEADERS[nombreHoja];
+  crearHojaPortalSiNoExiste_(ss, nombreHoja, headers);
+
+  registrarLog('', '', 'INICIALIZAR_PUNTOS_CLIENTE', 'OK', usuario + ' - hoja verificada');
+  return {
+    ok: true,
+    mensaje: 'PORTAL_PUNTOS_CLIENTE inicializada correctamente.'
+  };
+}
+
+function listarPuntosActivosClienteAdmin(idPortalCliente, adminToken) {
+  validarAdminToken_(adminToken);
+  const id = normalizarTexto_(idPortalCliente);
+  if (!id) throw new Error('Falta seleccionar un cliente.');
+
+  const puntos = leerPuntosCliente_(id, true);
+  return {
+    ok: true,
+    puntos: puntos
+  };
+}
+
+function crearPuntoClienteAdmin(data, adminToken) {
+  const usuario = validarAdminToken_(adminToken);
+  validarDataAdmin_(data, ['idPortalCliente', 'sector', 'puntoControl', 'tipoPunto']);
+  const cliente = obtenerClientePortalActivoPorId_(data.idPortalCliente);
+  const idPortalCliente = normalizarTexto_(cliente.ID_PORTAL_CLIENTE);
+  const orden = normalizarTexto_(data.orden) || String(obtenerSiguienteOrdenPuntoCliente_(idPortalCliente));
+
+  const row = {
+    ID_PUNTO_CLIENTE: generarId_('PTO'),
+    ID_PORTAL_CLIENTE: idPortalCliente,
+    SECTOR: normalizarTexto_(data.sector),
+    PUNTO_CONTROL: normalizarTexto_(data.puntoControl),
+    TIPO_PUNTO: normalizarTexto_(data.tipoPunto),
+    RESULTADO_DEFAULT: normalizarTexto_(data.resultadoDefault) || 'Sin actividad',
+    ACCION_CORRECTIVA_DEFAULT: normalizarTexto_(data.accionCorrectivaDefault) || 'No requiere',
+    ACTIVO: normalizarSiNo_(data.activo),
+    ORDEN: orden,
+    OBSERVACIONES: normalizarTexto_(data.observaciones),
+    FECHA_ALTA: new Date(),
+    USUARIO_CARGA: usuario
+  };
+
+  appendPortalRow_(PORTAL_CONFIG.HOJAS.PUNTOS_CLIENTE, row);
+  registrarLog('', idPortalCliente, 'CREAR_PUNTO_CLIENTE', 'OK', usuario + ' - ' + row.ID_PUNTO_CLIENTE);
+  return {
+    ok: true,
+    id: row.ID_PUNTO_CLIENTE,
+    mensaje: 'Punto de cliente creado.'
+  };
+}
+
+function actualizarPuntoClienteAdmin(idPuntoCliente, data, adminToken) {
+  validarAdminToken_(adminToken);
+  return actualizarRegistroPortalPorId_(
+    PORTAL_CONFIG.HOJAS.PUNTOS_CLIENTE,
+    'ID_PUNTO_CLIENTE',
+    idPuntoCliente,
+    data,
+    {
+      SECTOR: 'sector',
+      PUNTO_CONTROL: 'puntoControl',
+      TIPO_PUNTO: 'tipoPunto',
+      RESULTADO_DEFAULT: 'resultadoDefault',
+      ACCION_CORRECTIVA_DEFAULT: 'accionCorrectivaDefault',
+      ACTIVO: 'activo',
+      ORDEN: 'orden',
+      OBSERVACIONES: 'observaciones'
+    },
+    'ACTUALIZAR_PUNTO_CLIENTE'
+  );
+}
+
+function cambiarActivoPuntoClienteAdmin(idPuntoCliente, activo, adminToken) {
+  validarAdminToken_(adminToken);
+  const activoNormalizado = normalizarTexto_(activo).toUpperCase();
+  if (activoNormalizado !== 'SI' && activoNormalizado !== 'NO') {
+    throw new Error('ACTIVO debe ser SI o NO.');
+  }
+
+  return actualizarRegistroPortalPorId_(
+    PORTAL_CONFIG.HOJAS.PUNTOS_CLIENTE,
+    'ID_PUNTO_CLIENTE',
+    idPuntoCliente,
+    { activo: activoNormalizado },
+    { ACTIVO: 'activo' },
+    'CAMBIAR_ACTIVO_PUNTO_CLIENTE'
+  );
+}
+
 function obtenerOpcionesPortalAdmin(adminToken) {
   validarAdminToken_(adminToken);
   const defaults = obtenerOpcionesPortalDefault_();
@@ -670,6 +777,45 @@ function leerRegistrosGestionPortal_(nombreHoja, idPortalCliente, mapper) {
     .map(mapper);
 }
 
+function leerPuntosCliente_(idPortalCliente, soloActivos) {
+  const id = normalizarTexto_(idPortalCliente);
+  const puntos = leerFilasPorHeaders_(obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.PUNTOS_CLIENTE))
+    .filter(function(row) {
+      if (normalizarTexto_(row.ID_PORTAL_CLIENTE) !== id) return false;
+      return !soloActivos || esSi_(row.ACTIVO);
+    })
+    .map(function(row) {
+      return {
+        idPuntoCliente: normalizarTexto_(row.ID_PUNTO_CLIENTE),
+        idPortalCliente: normalizarTexto_(row.ID_PORTAL_CLIENTE),
+        sector: normalizarTexto_(row.SECTOR),
+        puntoControl: normalizarTexto_(row.PUNTO_CONTROL),
+        tipoPunto: normalizarTexto_(row.TIPO_PUNTO),
+        resultadoDefault: normalizarTexto_(row.RESULTADO_DEFAULT),
+        accionCorrectivaDefault: normalizarTexto_(row.ACCION_CORRECTIVA_DEFAULT),
+        activo: normalizarTexto_(row.ACTIVO) || 'NO',
+        orden: Number(row.ORDEN || 0),
+        observaciones: normalizarTexto_(row.OBSERVACIONES),
+        fechaAlta: formatearFecha_(row.FECHA_ALTA),
+        usuarioCarga: normalizarTexto_(row.USUARIO_CARGA)
+      };
+    });
+
+  puntos.sort(function(a, b) {
+    return (a.orden || 0) - (b.orden || 0) || a.puntoControl.localeCompare(b.puntoControl);
+  });
+
+  return puntos;
+}
+
+function obtenerSiguienteOrdenPuntoCliente_(idPortalCliente) {
+  const puntos = leerPuntosCliente_(idPortalCliente, false);
+  if (!puntos.length) return 1;
+  return puntos.reduce(function(max, punto) {
+    return Math.max(max, Number(punto.orden || 0));
+  }, 0) + 1;
+}
+
 function cambiarVisibleRegistroPortal_(nombreHoja, idHeader, idRegistro, visible, accion) {
   const id = normalizarTexto_(idRegistro);
   const visibleNormalizado = normalizarTexto_(visible).toUpperCase();
@@ -733,10 +879,10 @@ function actualizarRegistroPortalPorId_(nombreHoja, idHeader, idRegistro, data, 
     if (!col) return;
 
     let valor = data[dataKey];
-    if (header === 'VISIBLE') {
+    if (header === 'VISIBLE' || header === 'ACTIVO') {
       valor = normalizarTexto_(valor).toUpperCase();
       if (valor !== 'SI' && valor !== 'NO') {
-        throw new Error('VISIBLE debe ser SI o NO.');
+        throw new Error(header + ' debe ser SI o NO.');
       }
     } else if (header === 'FECHA_VISITA') {
       valor = valor ? new Date(valor) : '';
