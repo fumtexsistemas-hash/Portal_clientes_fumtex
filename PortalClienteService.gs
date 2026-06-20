@@ -88,8 +88,8 @@ function obtenerRegistrosVisiblesCliente_(nombreHoja, idPortalCliente, token, ca
 }
 
 /**
- * Devuelve el panel del cliente agrupado por visita/publicación.
- * Usa las funciones existentes para respetar la validación actual del portal.
+ * Devuelve el panel del cliente agrupado por visita/publicacion.
+ * Usa las funciones existentes para respetar la validacion actual del portal.
  *
  * @param {string} idPortalCliente
  * @param {string} token
@@ -148,7 +148,7 @@ function obtenerPanelClienteAgrupado(idPortalCliente, token) {
       contenido: obtenerValorCampoPortal_(pub, ['CONTENIDO', 'contenido', 'Contenido']),
       indicadores: indicadores,
       monitoreos: monitoreosVisita.map(normalizarMonitoreoPanelCliente_),
-      documentos: documentosVisita.map(normalizarDocumentoPanelCliente_)
+      documentos: documentosVisita.map(normalizarDocumentoPanelCliente_).sort(ordenarDocumentosPorFechaCargaDesc_)
     };
   });
 
@@ -162,7 +162,7 @@ function obtenerPanelClienteAgrupado(idPortalCliente, token) {
     ok: true,
     resumen: resumen,
     visitas: visitas,
-    documentosGenerales: documentosGenerales.map(normalizarDocumentoPanelCliente_)
+    documentosGenerales: documentosGenerales.map(normalizarDocumentoPanelCliente_).sort(ordenarDocumentosPorFechaCargaDesc_)
   };
 }
 
@@ -234,8 +234,13 @@ function normalizarDocumentoPanelCliente_(doc) {
     titulo: obtenerValorCampoPortal_(doc, ['TITULO', 'titulo', 'Titulo']),
     tipo: obtenerValorCampoPortal_(doc, ['TIPO', 'tipo', 'Tipo']),
     url: obtenerValorCampoPortal_(doc, ['URL', 'url', 'Url']),
-    descripcion: obtenerValorCampoPortal_(doc, ['DESCRIPCION', 'descripcion', 'Descripcion'])
+    descripcion: obtenerValorCampoPortal_(doc, ['DESCRIPCION', 'descripcion', 'Descripcion']),
+    fechaCarga: obtenerValorCampoPortal_(doc, ['FECHA_CARGA', 'fechaCarga', 'FechaCarga'])
   };
+}
+
+function ordenarDocumentosPorFechaCargaDesc_(a, b) {
+  return obtenerFechaOrdenPortal_(b.fechaCarga) - obtenerFechaOrdenPortal_(a.fechaCarga);
 }
 
 function calcularIndicadoresVisitaPortal_(monitoreos) {

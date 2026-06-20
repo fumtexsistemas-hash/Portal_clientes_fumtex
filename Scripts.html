@@ -233,7 +233,7 @@
     const url = item.URL || '';
     return '<article class="item"><strong>' + esc(item.TITULO || 'Documento') + '</strong><small>' +
       esc(item.TIPO || '') + '</small><p>' + esc(item.DESCRIPCION || '') +
-      '</p>' + (url ? '<a href="' + esc(url) + '" target="_blank">Abrir documento</a>' : '<small>Sin URL disponible</small>') + '</article>';
+      '</p>' + (url ? '<a href="' + esc(url) + '" target="_blank">Abrir / descargar PDF</a>' : '<small>Sin URL disponible</small>') + '</article>';
   }
 
   function limpiarSesionCliente() {
@@ -1162,11 +1162,54 @@
 
     return '<article class="panel"><h3>Documentos del cliente</h3><div class="list">' + documentos.map(function(item) {
       const link = item.url
-        ? '<a class="doc-link" href="' + esc(item.url) + '" target="_blank" rel="noopener">Abrir documento</a>'
+        ? '<a class="doc-link" href="' + esc(item.url) + '" target="_blank" rel="noopener">Abrir / descargar PDF</a>'
         : '<small>Sin URL disponible</small>';
       return '<div class="item"><strong>' + esc(item.titulo || 'Documento') + '</strong><small>' +
         esc(item.tipo || '') + '</small><p>' + esc(item.descripcion || '') + '</p>' + link + '</div>';
     }).join('') + '</div></article>';
+  }
+
+
+  function generarPdfParteServicioAdminUi(idPublicacion) {
+    const id = String(idPublicacion || '').trim();
+    const token = obtenerAdminToken();
+
+    if (!token) {
+      setMessage('adminMensaje', 'Primero ingresa con PIN admin.', true);
+      mostrarLoginAdmin();
+      return;
+    }
+
+    if (!id) {
+      setMessage('adminMensaje', 'Falta ID de publicacion para generar PDF.', true);
+      return;
+    }
+
+    if (!confirm('Se generara un PDF del parte de servicio y se publicara en el portal del cliente. Continuar?')) return;
+
+    setMessage('adminMensaje', 'Generando PDF...');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          setMessage('adminMensaje', res && res.mensaje ? res.mensaje : 'No se pudo generar el PDF.', true);
+          return;
+        }
+
+        mostrarMensajePdfGeneradoAdmin_(res);
+        cargarVistaClienteAdmin();
+      })
+      .withFailureHandler(function(error) {
+        setMessage('adminMensaje', error.message || String(error), true);
+      })
+      .generarPdfParteServicioAdmin(id, token);
+  }
+
+  function mostrarMensajePdfGeneradoAdmin_(res) {
+    const el = document.getElementById('adminMensaje');
+    if (!el) return;
+    el.className = 'message';
+    const url = res && res.url ? esc(res.url) : '';
+    el.innerHTML = 'PDF generado correctamente. El cliente ya puede abrirlo desde su portal.' + (url ? ' <a href="' + url + '" target="_blank" rel="noopener">Abrir PDF</a>' : '');
   }
 
   function limpiarGestionVisibilidadAdmin() {
@@ -1240,7 +1283,7 @@
     const visible = String(item.visible || '').toUpperCase() === 'SI' ? 'SI' : 'NO';
     const nuevoValor = visible === 'SI' ? 'NO' : 'SI';
     const accion = visible === 'SI' ? 'Ocultar' : 'Publicar';
-    const link = item.url ? '<a class="doc-link secondary-doc-link" href="' + esc(item.url) + '" target="_blank" rel="noopener">Abrir documento</a>' : '';
+    const link = item.url ? '<a class="doc-link secondary-doc-link" href="' + esc(item.url) + '" target="_blank" rel="noopener">Abrir / descargar PDF</a>' : '';
     return '<div class="item visibility-item"><div><strong>' + esc(item.titulo || item.id || 'Registro') +
       '</strong><small>' + esc([item.fecha, item.detalle, item.id].filter(Boolean).join(' - ')) +
       '</small><p>' + esc(item.resumen || '') + '</p><span class="visibility-pill visibility-' + esc(visible.toLowerCase()) +
@@ -1366,7 +1409,7 @@
     }
 
     return '<article class="panel"><h3>Documentos / PDFs</h3><div class="list">' + items.map(function(item, index) {
-      const link = item.url ? '<a class="doc-link secondary-doc-link" href="' + esc(item.url) + '" target="_blank" rel="noopener">Abrir documento</a>' : '';
+      const link = item.url ? '<a class="doc-link secondary-doc-link" href="' + esc(item.url) + '" target="_blank" rel="noopener">Abrir / descargar PDF</a>' : '';
       return '<div class="item"><strong>' + esc(item.titulo || item.id || 'Documento') + '</strong><small>' +
         esc([item.fecha, item.detalle, item.id].filter(Boolean).join(' - ')) +
         '</small><p>' + esc(item.resumen || '') + '</p><span class="visibility-pill visibility-' +
@@ -1755,7 +1798,7 @@ function renderTarjetaVisitaClienteUi_(visita, index) {
           '</span>' +
           '<span class="visita-cliente-toggle">Ver detalle</span>' +
         '</div>' +
-      '</button>' +
+      '      </button>' +
       '<div id="' + detalleId + '" class="visita-cliente-detalle" style="display:none;">' +
         renderDetalleServicioClienteUi_(visita) +
         renderMonitoreosVisitaClienteUi_(visita.monitoreos || []) +
@@ -1827,7 +1870,7 @@ function renderDocumentosVisitaClienteUi_(documentos) {
           '<span>' + escaparHtmlClienteUi_(doc.tipo || '') + '</span>' +
           (doc.descripcion ? '<p>' + escaparHtmlClienteUi_(doc.descripcion) + '</p>' : '') +
         '</div>' +
-        (doc.url ? '<a class="btn-documento-cliente" href="' + escaparAtributoClienteUi_(doc.url) + '" target="_blank" rel="noopener">Abrir documento</a>' : '') +
+        (doc.url ? '<a class="btn-documento-cliente" href="' + escaparAtributoClienteUi_(doc.url) + '" target="_blank" rel="noopener">Abrir / descargar PDF</a>' : '') +
       '</div>';
   });
 
@@ -1845,7 +1888,7 @@ function renderDocumentosGeneralesClienteUi_(documentos) {
           '<strong>' + escaparHtmlClienteUi_(doc.titulo || 'Documento') + '</strong>' +
           '<span>' + escaparHtmlClienteUi_(doc.tipo || '') + '</span>' +
         '</div>' +
-        (doc.url ? '<a class="btn-documento-cliente" href="' + escaparAtributoClienteUi_(doc.url) + '" target="_blank" rel="noopener">Abrir documento</a>' : '') +
+        (doc.url ? '<a class="btn-documento-cliente" href="' + escaparAtributoClienteUi_(doc.url) + '" target="_blank" rel="noopener">Abrir / descargar PDF</a>' : '') +
       '</div>';
   });
 
@@ -2124,6 +2167,10 @@ function renderTarjetaVisitaClienteLimpiaUi_(visita, index, contexto) {
   var puntosTexto = (indicadores.totalPuntos || 0) > 0
     ? escaparHtmlClienteUi_(indicadores.puntosControlados || 0) + '/' + escaparHtmlClienteUi_(indicadores.totalPuntos || 0) + ' puntos controlados'
     : 'Sin puntos de control';
+  var idPublicacion = visita.idPublicacion || '';
+  var accionesAdmin = contexto === 'admin' && idPublicacion
+    ? '<div class="visita-admin-actions"><button class="secondary-button" type="button" onclick="generarPdfParteServicioAdminUi(\'' + escaparAtributoClienteUi_(idPublicacion) + '\')">Generar PDF</button></div>'
+    : '';
 
   return '<article class="visita-cliente-card">' +
     '<button type="button" class="visita-cliente-header" onclick="toggleDetalleVisitaClienteUi(\'' + detalleId + '\')">' +
@@ -2139,6 +2186,7 @@ function renderTarjetaVisitaClienteLimpiaUi_(visita, index, contexto) {
         '<span class="visita-cliente-toggle">Ver detalle</span>' +
       '</div>' +
     '</button>' +
+    accionesAdmin +
     '<div id="' + detalleId + '" class="visita-cliente-detalle" style="display:none;">' +
       renderDetalleServicioClienteLimpioUi_(visita) +
       renderMonitoreosVisitaClienteLimpiosUi_(visita.monitoreos || []) +
@@ -2203,8 +2251,9 @@ function renderDocumentoClienteItemLimpioUi_(doc) {
   return '<div class="documento-cliente-item"><div><strong>' + escaparHtmlClienteUi_(doc.titulo || 'Documento') + '</strong>' +
     '<span>' + escaparHtmlClienteUi_(doc.tipo || '') + '</span>' +
     (doc.descripcion ? '<p>' + escaparHtmlClienteUi_(doc.descripcion) + '</p>' : '') +
+    (doc.fechaCarga ? '<p><small>Generado: ' + escaparHtmlClienteUi_(doc.fechaCarga) + '</small></p>' : '') +
     '</div>' +
-    (doc.url ? '<a class="btn-documento-cliente" href="' + escaparAtributoClienteUi_(doc.url) + '" target="_blank" rel="noopener">Abrir documento</a>' : '') +
+    (doc.url ? '<a class="btn-documento-cliente" href="' + escaparAtributoClienteUi_(doc.url) + '" target="_blank" rel="noopener">Abrir / descargar PDF</a>' : '') +
     '</div>';
 }
 

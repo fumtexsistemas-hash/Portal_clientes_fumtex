@@ -103,7 +103,7 @@ function crearPublicacionAdmin(data, adminToken) {
     RESUMEN_CLIENTE: normalizarTexto_(data.resumenCliente),
     CONTENIDO: normalizarTexto_(data.contenido),
     VISIBLE: normalizarSiNo_(data.visible),
-    FECHA_CARGA: new Date(),
+    FECHA_CARGA: fechaCarga,
     FECHA_PUBLICACION: data.fechaPublicacion ? new Date(data.fechaPublicacion) : new Date(),
     USUARIO_CARGA: usuario
   };
@@ -726,6 +726,331 @@ function cambiarVisibleDocumentoAdmin(idDocumento, visible, adminToken) {
     visible,
     'CAMBIAR_VISIBLE_DOCUMENTO'
   );
+}
+
+
+function generarPdfParteServicioAdmin(idPublicacion, adminToken) {
+  const usuario = validarAdminToken_(adminToken);
+  const id = normalizarTexto_(idPublicacion);
+  if (!id) throw new Error('Falta ID_PUBLICACION.');
+
+  const datos = obtenerDatosParteServicioPdf_(id);
+  const pdfInfo = crearDocumentoPdfParteServicio_(datos);
+  const archivoPdf = guardarPdfParteServicio_(datos, pdfInfo.pdfBlob);
+
+  try {
+    DriveApp.getFileById(pdfInfo.documentoId).setTrashed(true);
+  } catch (error) {
+    Logger.log('No se pudo enviar a papelera el documento temporal: ' + error.message);
+  }
+
+  const documento = registrarDocumentoPdfParteServicio_(datos, archivoPdf, usuario);
+  registrarLog('', datos.cliente.idPortalCliente, 'GENERAR_PDF_PARTE_SERVICIO', 'OK', usuario + ' - ' + id + ' - ' + documento.ID_DOCUMENTO);
+
+  return {
+    ok: true,
+    idDocumento: documento.ID_DOCUMENTO,
+    url: archivoPdf.getUrl(),
+    nombreArchivo: archivoPdf.getName(),
+    mensaje: 'PDF generado correctamente. El cliente ya puede abrirlo desde su portal.'
+  };
+}
+
+function obtenerDatosParteServicioPdf_(idPublicacion) {
+  const id = normalizarTexto_(idPublicacion);
+  const publicaciones = leerFilasPorHeaders_(obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.PUBLICACIONES));
+  const publicacion = publicaciones.find(function(row) {
+    return normalizarTexto_(row.ID_PUBLICACION) === id;
+  });
+
+  if (!publicacion) throw new Error('No existe una publicacion con ID_PUBLICACION: ' + id);
+
+  const idPortalCliente = normalizarTexto_(publicacion.ID_PORTAL_CLIENTE);
+  const cliente = obtenerClientePortalPorIdAdmin_(idPortalCliente);
+  if (!cliente) throw new Error('No existe el cliente asociado al parte: ' + idPortalCliente);
+
+  const monitoreos = leerFilasPorHeaders_(obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.MONITOREOS))
+    .filter(function(row) {
+      return normalizarTexto_(row.ID_PUBLICACION) === id;
+    })
+    .map(function(row) {
+      return {
+        sector: normalizarTexto_(row.SECTOR),
+        puntoControl: normalizarTexto_(row.PUNTO_CONTROL),
+        tipo: normalizarTexto_(row.TIPO),
+        resultado: normalizarTexto_(row.RESULTADO),
+        novedad: normalizarTexto_(row.NOVEDAD),
+        accionCorrectiva: normalizarTexto_(row.ACCION_CORRECTIVA),
+        observaciones: normalizarTexto_(row.OBSERVACIONES)
+      };
+    });
+
+  const documentos = leerFilasPorHeaders_(obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.DOCUMENTOS))
+    .filter(function(row) {
+      return normalizarTexto_(row.ID_PUBLICACION) === id && esSi_(row.VISIBLE);
+    })
+    .map(function(row) {
+      return {
+        titulo: normalizarTexto_(row.TITULO),
+        tipo: normalizarTexto_(row.TIPO),
+        url: normalizarTexto_(row.URL)
+      };
+    });
+
+  return {
+    publicacion: {
+      idPublicacion: id,
+      idPortalCliente: idPortalCliente,
+      fechaVisita: publicacion.FECHA_VISITA,
+      fechaVisitaTexto: formatearFechaPdf_(publicacion.FECHA_VISITA),
+      sucursal: normalizarTexto_(publicacion.SUCURSAL),
+      tipoServicio: normalizarTexto_(publicacion.TIPO_SERVICIO),
+      titulo: normalizarTexto_(publicacion.TITULO),
+      categoria: normalizarTexto_(publicacion.CATEGORIA),
+      estadoPublicacion: normalizarTexto_(publicacion.ESTADO_PUBLICACION),
+      resumenCliente: normalizarTexto_(publicacion.RESUMEN_CLIENTE),
+      contenido: normalizarTexto_(publicacion.CONTENIDO)
+    },
+    cliente: {
+      idPortalCliente: idPortalCliente,
+      razonSocial: normalizarTexto_(cliente.RAZON_SOCIAL),
+      nombreFantasia: normalizarTexto_(cliente.NOMBRE_FANTASIA),
+      cuit: normalizarTexto_(cliente.CUIT),
+      direccion: normalizarTexto_(cliente.DIRECCION),
+      carpetaDriveId: normalizarTexto_(cliente.CARPETA_DRIVE_ID)
+    },
+    monitoreos: monitoreos,
+    documentos: documentos
+  };
+}
+
+function crearDocumentoPdfParteServicio_(datos) {
+  const nombreArchivo = construirNombreArchivoParteServicio_(datos);
+  const doc = DocumentApp.create(nombreArchivo.replace(/\.pdf$/i, ''));
+  const body = doc.getBody();
+  body.clear();
+
+  agregarParrafoPdf_(body, 'FUMTEX', { heading: DocumentApp.ParagraphHeading.TITLE, color: '#2A6D33', bold: true });
+  agregarParrafoPdf_(body, 'Servicios Integrales', { color: '#3A8E40', bold: true });
+  agregarParrafoPdf_(body, 'Control de plagas y salud ambiental', { color: '#5E7A63' });
+  agregarParrafoPdf_(body, 'Rosario, Argentina', { color: '#5E7A63' });
+  agregarParrafoPdf_(body, 'www.fumtex.com.ar', { color: '#2A6D33', bold: true });
+  agregarParrafoPdf_(body, 'Registro Control de Vectores Nro. 245', { color: '#5E7A63' });
+  agregarParrafoPdf_(body, 'Habilitacion Municipal Nro. 3844/2022', { color: '#5E7A63' });
+  agregarParrafoPdf_(body, 'Tel: 3413197860', { color: '#5E7A63' });
+  agregarParrafoPdf_(body, 'Email: fumtexservicios@gmail.com', { color: '#5E7A63' });
+  body.appendHorizontalRule();
+
+  agregarParrafoPdf_(body, 'Parte de servicio', { heading: DocumentApp.ParagraphHeading.HEADING1, color: '#2A6D33', bold: true });
+  agregarParrafoPdf_(body, 'Fecha de emision: ' + formatearFechaPdf_(new Date()), { color: '#5E7A63' });
+
+  agregarParrafoPdf_(body, 'Datos del cliente', { heading: DocumentApp.ParagraphHeading.HEADING2, color: '#2A6D33', bold: true });
+  agregarTablaClaveValorPdf_(body, [
+    ['Razon social', datos.cliente.razonSocial],
+    ['Nombre fantasia', datos.cliente.nombreFantasia],
+    ['CUIT', datos.cliente.cuit],
+    ['Direccion', datos.cliente.direccion]
+  ]);
+
+  agregarParrafoPdf_(body, 'Datos del servicio', { heading: DocumentApp.ParagraphHeading.HEADING2, color: '#2A6D33', bold: true });
+  agregarTablaClaveValorPdf_(body, [
+    ['Fecha de visita', datos.publicacion.fechaVisitaTexto],
+    ['Sucursal / sector', datos.publicacion.sucursal],
+    ['Tipo de servicio', datos.publicacion.tipoServicio],
+    ['Categoria', datos.publicacion.categoria],
+    ['Titulo', datos.publicacion.titulo],
+    ['Estado publicacion', datos.publicacion.estadoPublicacion]
+  ]);
+
+  agregarParrafoPdf_(body, 'Informe para el cliente', { heading: DocumentApp.ParagraphHeading.HEADING2, color: '#2A6D33', bold: true });
+  agregarParrafoPdf_(body, datos.publicacion.resumenCliente || 'Sin resumen informado.', { bold: true });
+  agregarParrafoPdf_(body, datos.publicacion.contenido || 'Sin detalle adicional informado.');
+
+  agregarParrafoPdf_(body, 'Puntos controlados', { heading: DocumentApp.ParagraphHeading.HEADING2, color: '#2A6D33', bold: true });
+  agregarTablaPuntosPdf_(body, datos.monitoreos);
+
+  agregarParrafoPdf_(body, 'Documentos asociados', { heading: DocumentApp.ParagraphHeading.HEADING2, color: '#2A6D33', bold: true });
+  if (datos.documentos.length) {
+    datos.documentos.forEach(function(documento) {
+      agregarParrafoPdf_(body, (documento.titulo || 'Documento') + ' - ' + (documento.tipo || 'Sin tipo'));
+      if (documento.url) agregarParrafoPdf_(body, documento.url, { color: '#3A8E40' });
+    });
+  } else {
+    agregarParrafoPdf_(body, 'Sin documentos asociados visibles.');
+  }
+
+  body.appendHorizontalRule();
+  agregarParrafoPdf_(body, 'Documento generado automaticamente por FUMTEX.', { color: '#5E7A63' });
+  agregarParrafoPdf_(body, 'Fecha de emision: ' + formatearFechaPdf_(new Date()), { color: '#5E7A63' });
+
+  doc.saveAndClose();
+  const pdfBlob = DriveApp.getFileById(doc.getId()).getBlob().getAs(MimeType.PDF).setName(nombreArchivo);
+  return { documentoId: doc.getId(), pdfBlob: pdfBlob };
+}
+
+function guardarPdfParteServicio_(datos, pdfBlob) {
+  const carpetaId = obtenerCarpetaDestinoPdf_(datos);
+  let archivo;
+
+  if (carpetaId) {
+    try {
+      archivo = DriveApp.getFolderById(carpetaId).createFile(pdfBlob);
+      datos.carpetaPdfUsada = carpetaId;
+    } catch (error) {
+      Logger.log('No se pudo usar la carpeta destino PDF ' + carpetaId + ': ' + error.message);
+    }
+  }
+
+  if (!archivo) {
+    datos.carpetaPdfUsada = '';
+    archivo = DriveApp.createFile(pdfBlob);
+  }
+
+  configurarPermisoPdfPublico_(archivo);
+  return archivo;
+}
+
+function registrarDocumentoPdfParteServicio_(datos, archivoPdf, usuario) {
+  const carpetaId = obtenerCarpetaDestinoPdf_(datos);
+  const idDocumento = generarId_('DOC');
+  const fechaCarga = new Date();
+  const fechaCargaTexto = Utilities.formatDate(fechaCarga, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+  const row = {
+    ID_DOCUMENTO: idDocumento,
+    ID_PORTAL_CLIENTE: datos.cliente.idPortalCliente,
+    ID_PUBLICACION: datos.publicacion.idPublicacion,
+    TITULO: 'Parte de servicio - ' + (datos.publicacion.fechaVisitaTexto || datos.publicacion.idPublicacion) + ' - generado ' + fechaCargaTexto,
+    TIPO: 'Parte de servicio PDF',
+    URL: archivoPdf.getUrl(),
+    CARPETA_DRIVE_ID: datos.carpetaPdfUsada || '',
+    DESCRIPCION: 'PDF generado automaticamente desde el Admin',
+    VISIBLE: 'SI',
+    FECHA_CARGA: new Date(),
+    USUARIO_CARGA: usuario || 'ADMIN_PORTAL'
+  };
+
+  appendPortalRow_(PORTAL_CONFIG.HOJAS.DOCUMENTOS, row);
+  return row;
+}
+
+
+function configurarPermisoPdfPublico_(archivoPdf) {
+  archivoPdf.setSharing(
+    DriveApp.Access.ANYONE_WITH_LINK,
+    DriveApp.Permission.VIEW
+  );
+}
+
+function autorizarModuloPdfPortalClientes() {
+  const doc = DocumentApp.create('FUMTEX_Autorizacion_Modulo_PDF_Temporal');
+  doc.getBody().appendParagraph('Autorizacion temporal del modulo PDF Portal Clientes FUMTEX.');
+  doc.saveAndClose();
+
+  const docFile = DriveApp.getFileById(doc.getId());
+  const pdfBlob = docFile.getBlob().getAs(MimeType.PDF).setName('FUMTEX_Autorizacion_Modulo_PDF_Temporal.pdf');
+  const pdfFile = DriveApp.createFile(pdfBlob);
+
+  configurarPermisoPdfPublico_(pdfFile);
+
+  docFile.setTrashed(true);
+  pdfFile.setTrashed(true);
+
+  Logger.log('Modulo PDF autorizado correctamente');
+  return 'Modulo PDF autorizado correctamente';
+}
+
+function obtenerCarpetaDestinoPdf_(datos) {
+  const carpetaCliente = datos && datos.cliente ? normalizarTexto_(datos.cliente.carpetaDriveId) : '';
+  if (carpetaCliente) return carpetaCliente;
+  return normalizarTexto_(PropertiesService.getScriptProperties().getProperty('PORTAL_PDF_FOLDER_ID'));
+}
+
+function construirNombreArchivoParteServicio_(datos) {
+  const cliente = datos.cliente.razonSocial || datos.cliente.nombreFantasia || datos.cliente.idPortalCliente || 'Cliente';
+  const fecha = datos.publicacion.fechaVisitaTexto || formatearFechaPdf_(new Date());
+  return limpiarNombreArchivoPdf_('FUMTEX_ParteServicio_' + cliente + '_' + fecha + '_' + datos.publicacion.idPublicacion) + '.pdf';
+}
+
+function limpiarNombreArchivoPdf_(texto) {
+  return normalizarTexto_(texto)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 150) || 'FUMTEX_ParteServicio';
+}
+
+function formatearFechaPdf_(fecha) {
+  if (!fecha) return '';
+  if (Object.prototype.toString.call(fecha) === '[object Date]') {
+    return Utilities.formatDate(fecha, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+  }
+  const texto = normalizarTexto_(fecha);
+  if (/^\d{4}-\d{2}-\d{2}/.test(texto)) {
+    const partes = texto.substring(0, 10).split('-');
+    return partes[2] + '/' + partes[1] + '/' + partes[0];
+  }
+  return texto;
+}
+
+function agregarParrafoPdf_(body, texto, opciones) {
+  const opts = opciones || {};
+  const parrafo = body.appendParagraph(normalizarTexto_(texto));
+  if (opts.heading) parrafo.setHeading(opts.heading);
+  if (opts.bold !== undefined) parrafo.setBold(opts.bold);
+  if (opts.color) parrafo.setForegroundColor(opts.color);
+  parrafo.setFontFamily('Arial');
+  parrafo.setSpacingAfter(6);
+  return parrafo;
+}
+
+function agregarTablaClaveValorPdf_(body, filas) {
+  const tabla = body.appendTable(filas.map(function(fila) {
+    return [normalizarTexto_(fila[0]), normalizarTexto_(fila[1]) || '-'];
+  }));
+  tabla.setBorderColor('#C8C8C8');
+  for (let i = 0; i < tabla.getNumRows(); i++) {
+    const row = tabla.getRow(i);
+    row.getCell(0).setBackgroundColor('#F3F8F3').editAsText().setBold(true).setForegroundColor('#2A6D33');
+    row.getCell(1).editAsText().setForegroundColor('#333333');
+  }
+}
+
+function agregarTablaPuntosPdf_(body, monitoreos) {
+  if (!monitoreos || !monitoreos.length) {
+    agregarParrafoPdf_(body, 'Esta visita no tiene puntos de monitoreo asociados.');
+    return;
+  }
+
+  const filas = [[
+    'Sector',
+    'Punto',
+    'Tipo',
+    'Resultado',
+    'Novedad',
+    'Accion correctiva',
+    'Observaciones'
+  ]];
+
+  monitoreos.forEach(function(mon) {
+    filas.push([
+      mon.sector || '-',
+      mon.puntoControl || '-',
+      mon.tipo || '-',
+      mon.resultado || '-',
+      mon.novedad || '-',
+      mon.accionCorrectiva || '-',
+      mon.observaciones || '-'
+    ]);
+  });
+
+  const tabla = body.appendTable(filas);
+  tabla.setBorderColor('#C8C8C8');
+  const header = tabla.getRow(0);
+  for (let col = 0; col < header.getNumCells(); col++) {
+    header.getCell(col).setBackgroundColor('#2A6D33').editAsText().setBold(true).setForegroundColor('#FFFFFF');
+  }
 }
 
 function validarDataAdmin_(data, campos) {
