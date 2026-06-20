@@ -162,6 +162,76 @@ function crearDocumentoAdmin(data, adminToken) {
   return { ok: true, id: row.ID_DOCUMENTO, mensaje: 'Documento creado.' };
 }
 
+function crearVisitaRapidaAdmin(data, adminToken) {
+  const usuario = validarAdminToken_(adminToken);
+  validarDataAdmin_(data, ['idPortalCliente', 'fechaVisita', 'servicio', 'tipoIntervencion', 'caracterServicio']);
+  const cliente = obtenerClientePortalActivoPorId_(data.idPortalCliente);
+  const visible = normalizarTexto_(data.visible || 'SI').toUpperCase();
+  if (visible !== 'SI' && visible !== 'NO') throw new Error('VISIBLE debe ser SI o NO.');
+
+  const monitoreos = Array.isArray(data.monitoreos) ? data.monitoreos : [];
+  const idPublicacion = generarId_('PUB');
+  const contenido = normalizarTexto_(data.contenido) || construirContenidoVisitaRapida_(data);
+  const titulo = normalizarTexto_(data.titulo) || ('Servicio ' + normalizarTexto_(data.servicio));
+  const fechaVisita = new Date(data.fechaVisita);
+
+  const publicacion = {
+    ID_PUBLICACION: idPublicacion,
+    ID_PORTAL_CLIENTE: normalizarTexto_(cliente.ID_PORTAL_CLIENTE),
+    ID_VISITA_ORIGEN: 'VIS_RAPIDA',
+    FECHA_VISITA: fechaVisita,
+    SUCURSAL: normalizarTexto_(data.sucursal),
+    TIPO_SERVICIO: normalizarTexto_(data.servicio),
+    TITULO: titulo,
+    CATEGORIA: normalizarTexto_(data.tipoIntervencion) + ' - ' + normalizarTexto_(data.caracterServicio),
+    ESTADO_PUBLICACION: 'PUBLICADO',
+    RESUMEN_CLIENTE: normalizarTexto_(data.resumenCliente),
+    CONTENIDO: contenido,
+    VISIBLE: visible,
+    FECHA_CARGA: new Date(),
+    FECHA_PUBLICACION: new Date(),
+    USUARIO_CARGA: usuario
+  };
+
+  appendPortalRow_(PORTAL_CONFIG.HOJAS.PUBLICACIONES, publicacion);
+
+  let cantidadMonitoreos = 0;
+  monitoreos.forEach(function(punto) {
+    if (!punto) return;
+    const tieneDato = ['sector', 'puntoControl', 'tipoPunto', 'resultado', 'novedad', 'accionCorrectiva', 'observaciones'].some(function(key) {
+      return normalizarTexto_(punto[key]);
+    });
+    if (!tieneDato) return;
+
+    appendPortalRow_(PORTAL_CONFIG.HOJAS.MONITOREOS, {
+      ID_MONITOREO: generarId_('MON'),
+      ID_PUBLICACION: idPublicacion,
+      ID_PORTAL_CLIENTE: normalizarTexto_(cliente.ID_PORTAL_CLIENTE),
+      FECHA: fechaVisita,
+      SECTOR: normalizarTexto_(punto.sector),
+      PUNTO_CONTROL: normalizarTexto_(punto.puntoControl),
+      TIPO: normalizarTexto_(punto.tipoPunto),
+      RESULTADO: normalizarTexto_(punto.resultado),
+      NOVEDAD: normalizarTexto_(punto.novedad),
+      ACCION_CORRECTIVA: normalizarTexto_(punto.accionCorrectiva),
+      OBSERVACIONES: normalizarTexto_(punto.observaciones),
+      VISIBLE: visible,
+      FECHA_CARGA: new Date(),
+      USUARIO_CARGA: usuario
+    });
+    cantidadMonitoreos++;
+  });
+
+  registrarLog('', publicacion.ID_PORTAL_CLIENTE, 'CREAR_VISITA_RAPIDA', 'OK', idPublicacion + ' - puntos: ' + cantidadMonitoreos);
+
+  return {
+    ok: true,
+    idPublicacion: idPublicacion,
+    cantidadMonitoreos: cantidadMonitoreos,
+    mensaje: 'Visita cargada correctamente'
+  };
+}
+
 function listarClientesPortalAdmin(adminToken) {
   validarAdminToken_(adminToken);
   const hoja = obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.CLIENTES);
@@ -197,6 +267,72 @@ function listarPublicacionesPortalAdmin(adminToken) {
     };
   });
   return { ok: true, publicaciones: publicaciones };
+}
+
+function obtenerOpcionesPortalAdmin(adminToken) {
+  validarAdminToken_(adminToken);
+  const defaults = obtenerOpcionesPortalDefault_();
+
+  try {
+    const hoja = obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.OPCIONES);
+    const opciones = leerFilasPorHeaders_(hoja).filter(function(row) {
+      return esSi_(row.ACTIVO);
+    });
+
+    if (!opciones.length) {
+      return {
+        ok: true,
+        origen: 'DEFAULT',
+        mensaje: 'PORTAL_OPCIONES esta vacia. Se usan opciones por defecto.',
+        opciones: defaults
+      };
+    }
+
+    return {
+      ok: true,
+      origen: 'HOJA',
+      opciones: agruparOpcionesPortal_(opciones)
+    };
+  } catch (error) {
+    return {
+      ok: true,
+      origen: 'DEFAULT',
+      mensaje: 'PORTAL_OPCIONES no existe todavia. Se usan opciones por defecto.',
+      opciones: defaults
+    };
+  }
+}
+
+function inicializarOpcionesPortalAdmin(adminToken) {
+  const usuario = validarAdminToken_(adminToken);
+  const ss = abrirPortalSS_();
+  const nombreHoja = PORTAL_CONFIG.HOJAS.OPCIONES;
+  const headers = PORTAL_CONFIG.HEADERS[nombreHoja];
+  const hoja = crearHojaPortalSiNoExiste_(ss, nombreHoja, headers);
+
+  if (hoja.getLastRow() > 1) {
+    registrarLog('', '', 'INICIALIZAR_PORTAL_OPCIONES', 'OK', usuario + ' - hoja ya tenia opciones');
+    return {
+      ok: true,
+      mensaje: 'PORTAL_OPCIONES ya existe y tiene opciones cargadas.'
+    };
+  }
+
+  const filas = obtenerFilasOpcionesPortalDefault_();
+  if (filas.length) {
+    hoja.getRange(2, 1, filas.length, headers.length).setValues(filas.map(function(row) {
+      return headers.map(function(header) {
+        return row[header] === undefined ? '' : row[header];
+      });
+    }));
+  }
+
+  registrarLog('', '', 'INICIALIZAR_PORTAL_OPCIONES', 'OK', usuario + ' - opciones iniciales: ' + filas.length);
+  return {
+    ok: true,
+    mensaje: 'PORTAL_OPCIONES inicializada correctamente.',
+    cantidad: filas.length
+  };
 }
 
 function obtenerVistaClienteAdmin(idPortalCliente, adminToken) {
@@ -362,6 +498,75 @@ function actualizarPublicacionAdmin(idPublicacion, data, adminToken) {
     },
     'ACTUALIZAR_PUBLICACION'
   );
+}
+
+function obtenerOpcionesPortalDefault_() {
+  return agruparOpcionesPortal_(obtenerFilasOpcionesPortalDefault_());
+}
+
+function obtenerFilasOpcionesPortalDefault_() {
+  const grupos = {
+    SERVICIO: ['Fumigacion', 'Desratizacion', 'Desinsectacion', 'Desinfeccion', 'Monitoreo MIP', 'Inspeccion'],
+    TIPO_INTERVENCION: ['Preventivo', 'Correctivo', 'Refuerzo', 'Seguimiento'],
+    CARACTER_SERVICIO: ['Servicio usual / programado', 'Emergencia', 'Reclamo', 'Auditoria'],
+    TIPO_PUNTO: ['Caja cebadera', 'Trampa mecanica', 'Placa adhesiva', 'Punto de inspeccion', 'Otro'],
+    RESULTADO_MONITOREO: ['Sin actividad', 'Consumo bajo', 'Consumo medio', 'Consumo alto', 'Captura', 'Danada', 'Faltante', 'Reponer cebo', 'No inspeccionada'],
+    ACCION_CORRECTIVA: ['No requiere', 'Se repuso cebo', 'Se reemplazo caja', 'Se limpio el punto', 'Se reforzo tratamiento', 'Informar al cliente'],
+    TIPO_SERVICIO: ['Desinsectacion', 'Desratizacion', 'Monitoreo', 'Control integral', 'Visita tecnica'],
+    CATEGORIA_PUBLICACION: ['Visita', 'Informe', 'Certificado', 'Comunicado'],
+    ESTADO_PUBLICACION: ['PUBLICADO', 'BORRADOR'],
+    SUCURSAL: ['Casa central', 'Sucursal', 'Deposito', 'Planta'],
+    TIPO_DOCUMENTO: ['PDF', 'Certificado', 'Informe', 'Hoja de seguridad', 'Protocolo'],
+    TIPO_MONITOREO: ['Cebadero', 'Trampa', 'Inspeccion', 'Punto de control']
+  };
+
+  const filas = [];
+  Object.keys(grupos).forEach(function(grupo) {
+    grupos[grupo].forEach(function(valor, index) {
+      filas.push({
+        ID_OPCION: generarId_('OPC'),
+        GRUPO: grupo,
+        VALOR: valor,
+        ETIQUETA: valor,
+        ACTIVO: 'SI',
+        ORDEN: index + 1,
+        OBSERVACIONES: 'Default inicial'
+      });
+    });
+  });
+  return filas;
+}
+
+function construirContenidoVisitaRapida_(data) {
+  const partes = [];
+  if (normalizarTexto_(data.novedades)) partes.push('Novedades encontradas: ' + normalizarTexto_(data.novedades));
+  if (normalizarTexto_(data.consejos)) partes.push('Consejos / recomendaciones: ' + normalizarTexto_(data.consejos));
+  return partes.join('\n\n');
+}
+
+function agruparOpcionesPortal_(filas) {
+  const out = {};
+  filas.forEach(function(row) {
+    const grupo = normalizarTexto_(row.GRUPO);
+    if (!grupo) return;
+    const valor = normalizarTexto_(row.VALOR);
+    const etiqueta = normalizarTexto_(row.ETIQUETA) || valor;
+    if (!valor && !etiqueta) return;
+    if (!out[grupo]) out[grupo] = [];
+    out[grupo].push({
+      valor: valor || etiqueta,
+      etiqueta: etiqueta,
+      orden: Number(row.ORDEN || 0)
+    });
+  });
+
+  Object.keys(out).forEach(function(grupo) {
+    out[grupo].sort(function(a, b) {
+      return a.orden - b.orden || a.etiqueta.localeCompare(b.etiqueta);
+    });
+  });
+
+  return out;
 }
 
 function actualizarDocumentoAdmin(idDocumento, data, adminToken) {

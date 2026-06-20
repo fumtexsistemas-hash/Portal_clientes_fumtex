@@ -13,6 +13,7 @@ const PORTAL_CONFIG = {
     PUBLICACIONES: 'PORTAL_PUBLICACIONES',
     MONITOREOS: 'PORTAL_MONITOREOS',
     DOCUMENTOS: 'PORTAL_DOCUMENTOS',
+    OPCIONES: 'PORTAL_OPCIONES',
     LOG: 'PORTAL_LOG'
   },
   HEADERS: {
@@ -87,6 +88,15 @@ const PORTAL_CONFIG = {
       'VISIBLE',
       'FECHA_CARGA',
       'USUARIO_CARGA'
+    ],
+    PORTAL_OPCIONES: [
+      'ID_OPCION',
+      'GRUPO',
+      'VALOR',
+      'ETIQUETA',
+      'ACTIVO',
+      'ORDEN',
+      'OBSERVACIONES'
     ],
     PORTAL_LOG: [
       'ID_LOG',

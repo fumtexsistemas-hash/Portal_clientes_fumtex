@@ -3,6 +3,7 @@
     const data = {};
     Array.prototype.forEach.call(form.elements, function(el) {
       if (!el.name) return;
+      if (el.type === 'radio' && !el.checked) return;
       data[el.name] = el.type === 'checkbox' ? el.checked : el.value;
     });
     return data;
@@ -11,6 +12,18 @@
   window.portalAdminClientes = window.portalAdminClientes || [];
   window.portalAdminPublicaciones = window.portalAdminPublicaciones || [];
   window.portalAdminEdicion = window.portalAdminEdicion || { publicaciones: [], documentos: [] };
+  window.portalAdminOpciones = window.portalAdminOpciones || {};
+  window.portalVisitaRapidaPuntos = window.portalVisitaRapidaPuntos || 0;
+  window.portalVisitaTituloManual = window.portalVisitaTituloManual || false;
+  window.portalUltimaVisitaRapida = window.portalUltimaVisitaRapida || null;
+  const PORTAL_OPCIONES_FALLBACK = {
+    SERVICIO: ['Fumigacion', 'Desratizacion', 'Desinsectacion', 'Desinfeccion', 'Monitoreo MIP', 'Inspeccion'],
+    TIPO_INTERVENCION: ['Preventivo', 'Correctivo', 'Refuerzo', 'Seguimiento'],
+    CARACTER_SERVICIO: ['Servicio usual / programado', 'Emergencia', 'Reclamo', 'Auditoria'],
+    TIPO_PUNTO: ['Caja cebadera', 'Trampa mecanica', 'Placa adhesiva', 'Punto de inspeccion', 'Otro'],
+    RESULTADO_MONITOREO: ['Sin actividad', 'Consumo bajo', 'Consumo medio', 'Consumo alto', 'Captura', 'Danada', 'Faltante', 'Reponer cebo', 'No inspeccionada'],
+    ACCION_CORRECTIVA: ['No requiere', 'Se repuso cebo', 'Se reemplazo caja', 'Se limpio el punto', 'Se reforzo tratamiento', 'Informar al cliente']
+  };
 
   function setMessage(id, text, isError) {
     const el = document.getElementById(id);
@@ -294,11 +307,382 @@
 
     const target = document.getElementById('adminTab-' + tab);
     if (target) target.classList.remove('hidden');
+    if (tab === 'visitaRapida' && !Object.keys(window.portalAdminOpciones || {}).length) {
+      cargarOpcionesCargaRapidaAdmin();
+    }
+    if (tab === 'visitaRapida' && !document.querySelector('#visitaRapidaPuntos .visita-punto')) {
+      agregarPuntoVisitaRapida();
+    }
+    if (tab === 'visitaRapida') {
+      actualizarModoPuntosVisitaRapida();
+      actualizarPreviewVisitaRapida();
+    }
   }
 
   function recargarAdminListas() {
     cargarClientesAdmin();
     cargarPublicacionesAdmin();
+    cargarOpcionesPortalAdmin();
+  }
+
+  function cargarOpcionesPortalAdmin() {
+    const token = obtenerAdminToken();
+    if (!token) return;
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        console.log('opciones portal admin', res);
+        window.portalAdminOpciones = normalizarOpcionesPortalAdmin(res && res.ok ? res.opciones : {});
+        llenarOpcionesVisitaRapida();
+        if (res && res.mensaje) setMessage('adminMensaje', res.mensaje);
+      })
+      .withFailureHandler(function(error) {
+        console.error('error opciones portal admin', error);
+        window.portalAdminOpciones = normalizarOpcionesPortalAdmin({});
+        llenarOpcionesVisitaRapida();
+        setMessage('adminMensaje', 'No se pudieron cargar las opciones. Usa Inicializar opciones o revisa PORTAL_OPCIONES.', true);
+      })
+      .obtenerOpcionesPortalAdmin(token);
+  }
+
+  function cargarOpcionesCargaRapidaAdmin() {
+    cargarOpcionesPortalAdmin();
+  }
+
+  function inicializarOpcionesPortalUi() {
+    const token = obtenerAdminToken();
+    if (!token) {
+      setMessage('adminMensaje', 'Primero ingresa con PIN admin.', true);
+      mostrarLoginAdmin();
+      return;
+    }
+
+    if (!confirm('Esto creara PORTAL_OPCIONES si no existe y cargara opciones iniciales si esta vacia. Continuar?')) return;
+
+    setMessage('adminMensaje', 'Inicializando opciones...');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          setMessage('adminMensaje', res && res.mensaje ? res.mensaje : 'No se pudieron inicializar opciones.', true);
+          return;
+        }
+        setMessage('adminMensaje', res.mensaje || 'Opciones inicializadas.');
+        cargarOpcionesPortalAdmin();
+      })
+      .withFailureHandler(function(error) {
+        setMessage('adminMensaje', error.message || String(error), true);
+      })
+      .inicializarOpcionesPortalAdmin(token);
+  }
+
+  function llenarOpcionesVisitaRapida() {
+    llenarSelectOpcionesPortal('selectVisitaServicio', 'SERVICIO', 'Selecciona servicio');
+    llenarSelectOpcionesPortal('selectVisitaTipoIntervencion', 'TIPO_INTERVENCION', 'Selecciona tipo');
+    llenarSelectOpcionesPortal('selectVisitaCaracterServicio', 'CARACTER_SERVICIO', 'Selecciona caracter');
+    document.querySelectorAll('[data-opciones-grupo]').forEach(function(select) {
+      llenarSelectOpcionesPortal(select.id, select.dataset.opcionesGrupo, select.dataset.placeholder || 'Selecciona opcion');
+    });
+  }
+
+  function llenarSelectOpcionesPortal(selectId, grupo, placeholder) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    const actual = select.value;
+    const opciones = obtenerOpcionesPortalGrupo(grupo);
+    select.innerHTML = '';
+    select.appendChild(crearOption('', placeholder || 'Selecciona opcion'));
+    opciones.forEach(function(opcion) {
+      select.appendChild(crearOption(opcion.valor, opcion.etiqueta || opcion.valor));
+    });
+    if (actual && opciones.some(function(opcion) { return opcion.valor === actual; })) select.value = actual;
+    actualizarPreviewVisitaRapida();
+  }
+
+  function normalizarOpcionesPortalAdmin(opciones) {
+    const out = {};
+    const fuente = opciones || {};
+    Object.keys(PORTAL_OPCIONES_FALLBACK).forEach(function(grupo) {
+      const lista = Array.isArray(fuente[grupo]) && fuente[grupo].length
+        ? fuente[grupo]
+        : PORTAL_OPCIONES_FALLBACK[grupo];
+      out[grupo] = lista.map(function(opcion) {
+        if (typeof opcion === 'string') {
+          return { valor: opcion, etiqueta: opcion };
+        }
+        const valor = opcion && (opcion.valor || opcion.VALOR || opcion.etiqueta || opcion.ETIQUETA) || '';
+        const etiqueta = opcion && (opcion.etiqueta || opcion.ETIQUETA || opcion.valor || opcion.VALOR) || valor;
+        return {
+          valor: String(valor || '').trim(),
+          etiqueta: String(etiqueta || '').trim()
+        };
+      }).filter(function(opcion) {
+        return opcion.valor || opcion.etiqueta;
+      });
+    });
+    return out;
+  }
+
+  function obtenerOpcionesPortalGrupo(grupo) {
+    const opciones = (window.portalAdminOpciones && window.portalAdminOpciones[grupo]) || [];
+    if (opciones.length) return opciones;
+    return (PORTAL_OPCIONES_FALLBACK[grupo] || []).map(function(valor) {
+      return { valor: valor, etiqueta: valor };
+    });
+  }
+
+  function agregarPuntoVisitaRapida(punto) {
+    const target = document.getElementById('visitaRapidaPuntos');
+    if (!target) return;
+    const index = window.portalVisitaRapidaPuntos++;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'item visita-punto';
+    wrapper.dataset.puntoIndex = String(index);
+    wrapper.innerHTML = '<div class="visibility-item"><div><strong>Punto monitoreado</strong><small>Completá solo los puntos relevados</small></div>' +
+      '<button type="button" class="secondary-button" onclick="quitarPuntoVisitaRapida(this)">Quitar punto</button></div>' +
+      '<div class="form-grid">' +
+      '<label>Sector<input name="sector" value="' + esc(punto && punto.sector || '') + '"></label>' +
+      '<label>Punto de control<input name="puntoControl" value="' + esc(punto && punto.puntoControl || '') + '"></label>' +
+      '<label>Tipo de punto<select id="visitaTipoPunto-' + index + '" name="tipoPunto" data-opciones-grupo="TIPO_PUNTO" data-placeholder="Selecciona tipo de punto"></select></label>' +
+      '<label>Resultado<select id="visitaResultado-' + index + '" name="resultado" data-opciones-grupo="RESULTADO_MONITOREO" data-placeholder="Selecciona resultado"></select></label>' +
+      '<label>Acción correctiva<select id="visitaAccion-' + index + '" name="accionCorrectiva" data-opciones-grupo="ACCION_CORRECTIVA" data-placeholder="Selecciona accion"></select></label>' +
+      '</div><label>Novedad<textarea name="novedad">' + esc(punto && punto.novedad || '') +
+      '</textarea></label><label>Observaciones<textarea name="observaciones">' + esc(punto && punto.observaciones || '') + '</textarea></label>';
+    target.appendChild(wrapper);
+    llenarOpcionesVisitaRapida();
+  }
+
+  function quitarPuntoVisitaRapida(button) {
+    const item = button ? button.closest('.visita-punto') : null;
+    if (item) item.remove();
+  }
+
+  function limpiarVisitaRapida() {
+    const form = document.getElementById('formVisitaRapida');
+    if (form) form.reset();
+    const target = document.getElementById('visitaRapidaPuntos');
+    if (target) target.innerHTML = '';
+    window.portalVisitaRapidaPuntos = 0;
+    agregarPuntoVisitaRapida();
+    llenarOpcionesVisitaRapida();
+    setMessage('adminMensaje', '');
+  }
+
+  function crearVisitaRapidaUi(event) {
+    event.preventDefault();
+    const form = event.target;
+    const token = obtenerAdminToken();
+    if (!token) {
+      setMessage('adminMensaje', 'Primero ingresa con PIN admin.', true);
+      mostrarLoginAdmin();
+      return;
+    }
+
+    const data = formToObject(form);
+    data.monitoreos = obtenerPuntosVisitaRapida();
+    setMessage('adminMensaje', 'Guardando visita completa...');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          setMessage('adminMensaje', res && res.mensaje ? res.mensaje : 'No se pudo guardar la visita.', true);
+          return;
+        }
+        setMessage('adminMensaje', 'Visita cargada correctamente. Publicación: ' + res.idPublicacion + '. Puntos cargados: ' + res.cantidadMonitoreos + '.');
+        limpiarVisitaRapida();
+        recargarAdminListas();
+      })
+      .withFailureHandler(function(error) {
+        setMessage('adminMensaje', error.message || String(error), true);
+      })
+      .crearVisitaRapidaAdmin(data, token);
+  }
+
+  function obtenerPuntosVisitaRapida() {
+    return Array.prototype.map.call(document.querySelectorAll('#visitaRapidaPuntos .visita-punto'), function(item) {
+      const punto = {};
+      Array.prototype.forEach.call(item.querySelectorAll('input, textarea, select'), function(el) {
+        if (!el.name) return;
+        punto[el.name] = el.value;
+      });
+      return punto;
+    });
+  }
+
+  function agregarPuntoVisitaRapida(punto) {
+    const target = document.getElementById('visitaRapidaPuntos');
+    if (!target) return;
+    const index = window.portalVisitaRapidaPuntos++;
+    const numero = target.querySelectorAll('.visita-punto').length + 1;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'item visita-punto service-point-card';
+    wrapper.dataset.puntoIndex = String(index);
+    wrapper.innerHTML = '<div class="visibility-item"><div><strong>Punto ' + numero + '</strong><small>Completa solo los datos relevados en este punto</small></div>' +
+      '<button type="button" class="secondary-button" onclick="quitarPuntoVisitaRapida(this)">Quitar punto</button></div>' +
+      '<div class="form-grid">' +
+      '<label>Sector<input name="sector" placeholder="Ej: Deposito, cocina, perimetro" value="' + esc(punto && punto.sector || '') + '"></label>' +
+      '<label>Punto de control<input name="puntoControl" placeholder="Ej: Caja 01, trampa norte" value="' + esc(punto && punto.puntoControl || '') + '"></label>' +
+      '<label>Tipo de punto<select id="visitaTipoPunto-' + index + '" name="tipoPunto" data-opciones-grupo="TIPO_PUNTO" data-placeholder="Selecciona tipo de punto"></select></label>' +
+      '<label>Resultado<select id="visitaResultado-' + index + '" name="resultado" data-opciones-grupo="RESULTADO_MONITOREO" data-placeholder="Selecciona resultado"></select></label>' +
+      '<label>Accion correctiva<select id="visitaAccion-' + index + '" name="accionCorrectiva" data-opciones-grupo="ACCION_CORRECTIVA" data-placeholder="Selecciona accion"></select></label>' +
+      '</div><label>Novedad<textarea name="novedad" placeholder="Ej: Se observa consumo bajo en la caja.">' + esc(punto && punto.novedad || '') +
+      '</textarea></label><label>Observaciones<textarea name="observaciones">' + esc(punto && punto.observaciones || '') + '</textarea></label>';
+    target.appendChild(wrapper);
+    llenarOpcionesVisitaRapida();
+    if (punto) {
+      if (punto.tipoPunto) wrapper.querySelector('[name="tipoPunto"]').value = punto.tipoPunto;
+      if (punto.resultado) wrapper.querySelector('[name="resultado"]').value = punto.resultado;
+      if (punto.accionCorrectiva) wrapper.querySelector('[name="accionCorrectiva"]').value = punto.accionCorrectiva;
+    }
+    actualizarPreviewVisitaRapida();
+  }
+
+  function quitarPuntoVisitaRapida(button) {
+    const item = button ? button.closest('.visita-punto') : null;
+    if (item) item.remove();
+    renumerarPuntosVisitaRapida();
+    actualizarPreviewVisitaRapida();
+  }
+
+  function limpiarVisitaRapida() {
+    const form = document.getElementById('formVisitaRapida');
+    if (form) form.reset();
+    const target = document.getElementById('visitaRapidaPuntos');
+    if (target) target.innerHTML = '';
+    window.portalVisitaRapidaPuntos = 0;
+    window.portalVisitaTituloManual = false;
+    window.portalUltimaVisitaRapida = null;
+    agregarPuntoVisitaRapida();
+    llenarOpcionesVisitaRapida();
+    actualizarModoPuntosVisitaRapida();
+    actualizarPreviewVisitaRapida();
+    const postSave = document.getElementById('visitaRapidaPostSave');
+    if (postSave) postSave.classList.add('hidden');
+    setMessage('adminMensaje', '');
+  }
+
+  function marcarTituloVisitaManual() {
+    window.portalVisitaTituloManual = true;
+    actualizarPreviewVisitaRapida();
+  }
+
+  function autocompletarTituloVisitaRapida() {
+    const form = document.getElementById('formVisitaRapida');
+    if (!form || window.portalVisitaTituloManual) {
+      actualizarPreviewVisitaRapida();
+      return;
+    }
+    const servicio = obtenerTextoSelect(form.elements.servicio);
+    const tipo = obtenerTextoSelect(form.elements.tipoIntervencion);
+    if (servicio && tipo && form.elements.titulo) {
+      form.elements.titulo.value = ('Servicio ' + tipo.toLowerCase() + ' de ' + servicio.toLowerCase()).replace(/\s+/g, ' ').trim();
+    }
+    actualizarPreviewVisitaRapida();
+  }
+
+  function actualizarModoPuntosVisitaRapida() {
+    const form = document.getElementById('formVisitaRapida');
+    const wrap = document.getElementById('visitaRapidaPuntosWrap');
+    if (!form || !wrap) return;
+    const mostrar = !form.elements.incluyePuntos || form.elements.incluyePuntos.value !== 'NO';
+    wrap.classList.toggle('hidden', !mostrar);
+    if (mostrar && !document.querySelector('#visitaRapidaPuntos .visita-punto')) {
+      agregarPuntoVisitaRapida();
+    }
+    actualizarPreviewVisitaRapida();
+  }
+
+  function renumerarPuntosVisitaRapida() {
+    Array.prototype.forEach.call(document.querySelectorAll('#visitaRapidaPuntos .visita-punto'), function(item, index) {
+      const title = item.querySelector('.visibility-item strong');
+      if (title) title.textContent = 'Punto ' + (index + 1);
+    });
+  }
+
+  function actualizarPreviewVisitaRapida() {
+    const preview = document.getElementById('previewVisitaRapida');
+    const form = document.getElementById('formVisitaRapida');
+    if (!preview || !form) return;
+    const data = formToObject(form);
+    const cliente = obtenerClienteAdminPorId(data.idPortalCliente);
+    const incluyePuntos = data.incluyePuntos !== 'NO';
+    const cantidadPuntos = incluyePuntos ? obtenerPuntosVisitaRapida().filter(function(punto) {
+      return Object.keys(punto).some(function(key) { return String(punto[key] || '').trim(); });
+    }).length : 0;
+    const items = [
+      ['Cliente seleccionado', cliente ? textoClienteAdmin(cliente) : 'Sin seleccionar'],
+      ['Fecha', data.fechaVisita || 'Sin fecha'],
+      ['Sucursal', data.sucursal || 'Sin cargar'],
+      ['Servicio', obtenerTextoSelect(form.elements.servicio) || 'Sin seleccionar'],
+      ['Tipo de intervencion', obtenerTextoSelect(form.elements.tipoIntervencion) || 'Sin seleccionar'],
+      ['Tipo de atencion', obtenerTextoSelect(form.elements.caracterServicio) || 'Sin seleccionar'],
+      ['Titulo', data.titulo || 'Sin titulo'],
+      ['Resumen', data.resumenCliente || 'Sin resumen'],
+      ['Cantidad de puntos cargados', String(cantidadPuntos)],
+      ['Visible', data.visible || 'SI']
+    ];
+    preview.innerHTML = items.map(function(item) {
+      return '<div><span>' + esc(item[0]) + '</span><strong>' + esc(item[1]) + '</strong></div>';
+    }).join('');
+  }
+
+  function obtenerTextoSelect(select) {
+    if (!select || select.selectedIndex < 0) return '';
+    return select.options[select.selectedIndex].textContent || select.value || '';
+  }
+
+  function irAVistaClienteDesdeVisitaRapida() {
+    const ultima = window.portalUltimaVisitaRapida;
+    mostrarAdminTab('vistaCliente');
+    if (!ultima || !ultima.idPortalCliente) return;
+    const select = document.getElementById('selectClienteVista');
+    if (select) select.value = ultima.idPortalCliente;
+    if (typeof cargarVistaClienteAdmin === 'function') cargarVistaClienteAdmin();
+  }
+
+  function crearVisitaRapidaUi(event) {
+    event.preventDefault();
+    const form = event.target;
+    const token = obtenerAdminToken();
+    if (!token) {
+      setMessage('adminMensaje', 'Primero ingresa con PIN admin.', true);
+      mostrarLoginAdmin();
+      return;
+    }
+
+    const data = formToObject(form);
+    data.monitoreos = data.incluyePuntos === 'NO' ? [] : obtenerPuntosVisitaRapida();
+    setMessage('adminMensaje', 'Guardando parte de servicio...');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          setMessage('adminMensaje', res && res.mensaje ? res.mensaje : 'No se pudo guardar el parte.', true);
+          return;
+        }
+        window.portalUltimaVisitaRapida = {
+          idPublicacion: res.idPublicacion,
+          idPortalCliente: data.idPortalCliente
+        };
+        setMessage('adminMensaje', 'Parte guardado correctamente. Publicacion: ' + res.idPublicacion + '. Puntos cargados: ' + res.cantidadMonitoreos + '.');
+        const postSave = document.getElementById('visitaRapidaPostSave');
+        if (postSave) postSave.classList.remove('hidden');
+        recargarAdminListas();
+      })
+      .withFailureHandler(function(error) {
+        setMessage('adminMensaje', error.message || String(error), true);
+      })
+      .crearVisitaRapidaAdmin(data, token);
+  }
+
+  function obtenerPuntosVisitaRapida() {
+    const form = document.getElementById('formVisitaRapida');
+    if (form && form.elements.incluyePuntos && form.elements.incluyePuntos.value === 'NO') return [];
+    return Array.prototype.map.call(document.querySelectorAll('#visitaRapidaPuntos .visita-punto'), function(item) {
+      const punto = {};
+      Array.prototype.forEach.call(item.querySelectorAll('input, textarea, select'), function(el) {
+        if (!el.name) return;
+        punto[el.name] = el.value;
+      });
+      return punto;
+    });
   }
 
   function cargarClientesAdmin() {
@@ -357,7 +741,7 @@
 
   function actualizarSelectsClientesAdmin() {
     const clientes = window.portalAdminClientes || [];
-    const ids = ['selectClienteUsuario', 'selectClientePublicacion', 'selectClienteMonitoreo', 'selectClienteDocumento', 'selectClienteVista', 'selectClienteVisibilidad', 'selectClienteEdicion'];
+    const ids = ['selectClienteUsuario', 'selectClientePublicacion', 'selectClienteMonitoreo', 'selectClienteDocumento', 'selectClienteVista', 'selectClienteVisibilidad', 'selectClienteEdicion', 'selectClienteVisitaRapida'];
     ids.forEach(function(id) {
       const select = document.getElementById(id);
       if (!select) return;

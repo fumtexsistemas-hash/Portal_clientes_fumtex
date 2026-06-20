@@ -56,7 +56,8 @@
           <button type="button" class="admin-tab active" data-admin-tab="clientes" onclick="mostrarAdminTab('clientes')">Clientes</button>
           <button type="button" class="admin-tab" data-admin-tab="usuarios" onclick="mostrarAdminTab('usuarios')">Usuarios</button>
           <button type="button" class="admin-tab" data-admin-tab="publicaciones" onclick="mostrarAdminTab('publicaciones')">Visitas/Publicaciones</button>
-          <button type="button" class="admin-tab" data-admin-tab="monitoreos" onclick="mostrarAdminTab('monitoreos')">Monitoreos</button>
+          <button type="button" class="admin-tab" data-admin-tab="visitaRapida" onclick="mostrarAdminTab('visitaRapida')">Nuevo parte de servicio</button>
+          <button type="button" class="admin-tab" data-admin-tab="monitoreos" onclick="mostrarAdminTab('monitoreos')">Monitoreos avanzado</button>
           <button type="button" class="admin-tab" data-admin-tab="documentos" onclick="mostrarAdminTab('documentos')">Documentos</button>
           <button type="button" class="admin-tab" data-admin-tab="vistaCliente" onclick="mostrarAdminTab('vistaCliente')">Vista cliente</button>
           <button type="button" class="admin-tab" data-admin-tab="visibilidad" onclick="mostrarAdminTab('visibilidad')">Gestionar visibilidad</button>
@@ -152,6 +153,9 @@
         <section id="adminTab-publicaciones" class="admin-tab-panel hidden">
           <form class="panel admin-form" onsubmit="crearPublicacionUi(event)">
             <h2>Nueva visita/publicacion</h2>
+            <div class="inline-actions">
+              <button class="secondary-button" type="button" onclick="inicializarOpcionesPortalUi()">Inicializar opciones</button>
+            </div>
             <div class="form-grid">
               <label>Cliente
                 <select id="selectClientePublicacion" name="idPortalCliente" required>
@@ -205,7 +209,8 @@
 
         <section id="adminTab-monitoreos" class="admin-tab-panel hidden">
           <form class="panel admin-form" onsubmit="crearMonitoreoUi(event)">
-            <h2>Nuevo monitoreo</h2>
+            <h2>Monitoreo avanzado</h2>
+            <p class="muted">Carga t&eacute;cnica de puntos individuales. Para cargar una visita completa us&aacute; Nuevo parte de servicio.</p>
             <div class="form-grid">
               <label>Publicacion
                 <select id="selectPublicacionMonitoreo" name="idPublicacion">
@@ -249,6 +254,138 @@
               <textarea name="observaciones"></textarea>
             </label>
             <button type="submit">Guardar monitoreo</button>
+          </form>
+        </section>
+
+        <section id="adminTab-visitaRapida" class="admin-tab-panel hidden">
+          <form id="formVisitaRapida" class="admin-form service-wizard" onsubmit="crearVisitaRapidaUi(event)" oninput="actualizarPreviewVisitaRapida()" onchange="actualizarPreviewVisitaRapida()">
+            <section class="panel service-hero">
+              <div>
+                <span class="eyebrow">Portal Clientes FUMTEX</span>
+                <h2>Nuevo parte de servicio</h2>
+                <p class="muted">Carg&aacute; la visita una sola vez. El sistema genera la publicaci&oacute;n para el cliente y, si corresponde, los puntos controlados.</p>
+              </div>
+              <button class="secondary-button" type="button" onclick="inicializarOpcionesPortalUi()">Inicializar opciones</button>
+            </section>
+
+            <section class="panel service-step">
+              <div class="step-heading">
+                <span>Paso 1</span>
+                <div>
+                  <h3>Cliente y visita</h3>
+                  <p>Estos datos identifican la visita que se va a publicar en el portal del cliente.</p>
+                </div>
+              </div>
+              <div class="form-grid">
+                <label>Cliente
+                  <select id="selectClienteVisitaRapida" name="idPortalCliente" required>
+                    <option value="">Cargando clientes...</option>
+                  </select>
+                </label>
+                <label>Fecha de visita
+                  <input name="fechaVisita" type="date" required>
+                </label>
+                <label>Sucursal / planta / sector visitado
+                  <input name="sucursal" placeholder="Ej: Planta principal, cocina, deposito">
+                </label>
+                <label>Visible para el cliente
+                  <select name="visible" required>
+                    <option value="SI">SI</option>
+                    <option value="NO">NO</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+
+            <section class="panel service-step">
+              <div class="step-heading">
+                <span>Paso 2</span>
+                <div>
+                  <h3>Servicio realizado</h3>
+                  <p>Eleg&iacute; el servicio y el tipo de atenci&oacute;n. El t&iacute;tulo se completa solo y pod&eacute;s editarlo.</p>
+                </div>
+              </div>
+              <div class="form-grid">
+                <label>&iquest;Qu&eacute; servicio se realiz&oacute;?
+                  <select id="selectVisitaServicio" name="servicio" required onchange="autocompletarTituloVisitaRapida()"></select>
+                </label>
+                <label>&iquest;El servicio fue?
+                  <select id="selectVisitaTipoIntervencion" name="tipoIntervencion" required onchange="autocompletarTituloVisitaRapida()"></select>
+                </label>
+                <label>&iquest;Tipo de atenci&oacute;n?
+                  <select id="selectVisitaCaracterServicio" name="caracterServicio" required onchange="autocompletarTituloVisitaRapida()"></select>
+                </label>
+                <label>T&iacute;tulo para el cliente
+                  <input id="inputVisitaTitulo" name="titulo" placeholder="Ej: Servicio preventivo de fumigaci&oacute;n" oninput="marcarTituloVisitaManual()">
+                </label>
+              </div>
+            </section>
+
+            <section class="panel service-step">
+              <div class="step-heading">
+                <span>Paso 3</span>
+                <div>
+                  <h3>Informe para el cliente</h3>
+                  <p>Us&aacute; lenguaje claro y operativo. Esto es lo que el cliente va a leer en su portal.</p>
+                </div>
+              </div>
+              <label>Novedades encontradas
+                <textarea name="novedades" placeholder="Ej: No se observaron indicios de actividad de plagas al momento de la visita."></textarea>
+              </label>
+              <label>Recomendaciones / consejos
+                <textarea name="consejos" placeholder="Ej: Mantener orden, limpieza y evitar acumulaci&oacute;n de mercader&iacute;a contra paredes."></textarea>
+              </label>
+              <label>Resumen breve para el portal
+                <textarea name="resumenCliente" placeholder="Ej: Servicio realizado sin desv&iacute;os relevantes."></textarea>
+              </label>
+              <label>Detalle adicional opcional
+                <textarea name="contenido" placeholder="Detalle interno/publicable adicional si hace falta."></textarea>
+              </label>
+            </section>
+
+            <section class="panel service-step">
+              <div class="step-heading">
+                <span>Paso 4</span>
+                <div>
+                  <h3>Control de cajas cebaderas / puntos de monitoreo</h3>
+                  <p>Indic&aacute; si esta visita incluy&oacute; control de puntos. Si no corresponde, se guarda solo el parte.</p>
+                </div>
+              </div>
+              <fieldset class="choice-box">
+                <legend>&iquest;Se controlaron cajas cebaderas o puntos de monitoreo?</legend>
+                <label><input type="radio" name="incluyePuntos" value="SI" checked onchange="actualizarModoPuntosVisitaRapida()"> S&iacute;, cargar puntos</label>
+                <label><input type="radio" name="incluyePuntos" value="NO" onchange="actualizarModoPuntosVisitaRapida()"> No, esta visita no incluye monitoreo de puntos</label>
+              </fieldset>
+              <div id="visitaRapidaPuntosWrap">
+                <div class="visibility-item">
+                  <div>
+                    <h3>Puntos controlados</h3>
+                    <p class="muted">Carg&aacute; solo los puntos relevados durante la visita.</p>
+                  </div>
+                  <button class="secondary-button" type="button" onclick="agregarPuntoVisitaRapida()">Agregar punto</button>
+                </div>
+                <div id="visitaRapidaPuntos" class="service-points"></div>
+              </div>
+            </section>
+
+            <section class="panel service-step service-preview">
+              <div class="step-heading">
+                <span>Paso 5</span>
+                <div>
+                  <h3>Revisar y guardar</h3>
+                  <p>Confirm&aacute; que el parte est&eacute; correcto antes de publicarlo.</p>
+                </div>
+              </div>
+              <div id="previewVisitaRapida" class="preview-list"></div>
+              <div id="visitaRapidaPostSave" class="post-save-actions hidden">
+                <button class="secondary-button" type="button" onclick="irAVistaClienteDesdeVisitaRapida()">Ver como cliente</button>
+                <button class="secondary-button" type="button" onclick="limpiarVisitaRapida()">Cargar otro parte</button>
+              </div>
+              <div class="inline-actions service-actions">
+                <button class="secondary-button" type="button" onclick="limpiarVisitaRapida()">Limpiar formulario</button>
+                <button type="submit">Guardar parte de servicio</button>
+              </div>
+            </section>
           </form>
         </section>
 
