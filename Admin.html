@@ -54,10 +54,10 @@
         </section>
 
         <nav class="admin-tabs" aria-label="Secciones admin">
-          <button type="button" class="admin-tab active" data-admin-tab="clientes" onclick="mostrarAdminTab('clientes')">Clientes</button>
+          <button type="button" class="admin-tab" data-admin-tab="clientes" onclick="mostrarAdminTab('clientes')">Clientes</button>
           <button type="button" class="admin-tab" data-admin-tab="usuarios" onclick="mostrarAdminTab('usuarios')">Usuarios</button>
-          <button type="button" class="admin-tab" data-admin-tab="publicaciones" onclick="mostrarAdminTab('publicaciones')">Visitas/Publicaciones</button>
-          <button type="button" class="admin-tab" data-admin-tab="visitaRapida" onclick="mostrarAdminTab('visitaRapida')">Nuevo parte de servicio</button>
+          <button type="button" class="admin-tab" data-admin-tab="publicaciones" onclick="mostrarAdminTab('publicaciones')">Carga avanzada</button>
+          <button type="button" class="admin-tab active" data-admin-tab="visitaRapida" onclick="mostrarAdminTab('visitaRapida')">Nuevo parte de servicio</button>
           <button type="button" class="admin-tab" data-admin-tab="plantillaPuntos" onclick="mostrarAdminTab('plantillaPuntos')">Plantilla de puntos</button>
           <button type="button" class="admin-tab" data-admin-tab="monitoreos" onclick="mostrarAdminTab('monitoreos')">Monitoreos avanzado</button>
           <button type="button" class="admin-tab" data-admin-tab="documentos" onclick="mostrarAdminTab('documentos')">Documentos</button>
@@ -68,7 +68,7 @@
 
         <p id="adminMensaje" class="message"></p>
 
-        <section id="adminTab-clientes" class="admin-tab-panel">
+        <section id="adminTab-clientes" class="admin-tab-panel hidden">
           <form class="panel admin-form" onsubmit="crearClientePortalUi(event)">
             <h2>Nuevo cliente del portal</h2>
             <div class="form-grid">
@@ -154,7 +154,8 @@
 
         <section id="adminTab-publicaciones" class="admin-tab-panel hidden">
           <form class="panel admin-form" onsubmit="crearPublicacionUi(event)">
-            <h2>Nueva visita/publicacion</h2>
+            <h2>Carga avanzada</h2>
+            <p class="muted">Esta es una carga tecnica/manual. Para cargar un servicio completo usa la pestana Nuevo parte de servicio.</p>
             <div class="inline-actions">
               <button class="secondary-button" type="button" onclick="inicializarOpcionesPortalUi()">Inicializar opciones</button>
             </div>
@@ -212,7 +213,7 @@
         <section id="adminTab-monitoreos" class="admin-tab-panel hidden">
           <form class="panel admin-form" onsubmit="crearMonitoreoUi(event)">
             <h2>Monitoreo avanzado</h2>
-            <p class="muted">Carga t&eacute;cnica de puntos individuales. Para cargar una visita completa us&aacute; Nuevo parte de servicio.</p>
+            <p class="muted">Carga tecnica de puntos individuales. Para cargar una visita completa usa Nuevo parte de servicio.</p>
             <div class="form-grid">
               <label>Publicacion
                 <select id="selectPublicacionMonitoreo" name="idPublicacion">
@@ -259,7 +260,7 @@
           </form>
         </section>
 
-        <section id="adminTab-visitaRapida" class="admin-tab-panel hidden">
+        <section id="adminTab-visitaRapida" class="admin-tab-panel">
           <form id="formVisitaRapida" class="admin-form service-wizard" onsubmit="crearVisitaRapidaUi(event)" oninput="actualizarPreviewVisitaRapida()" onchange="actualizarPreviewVisitaRapida()">
             <section class="panel service-hero">
               <div>
@@ -331,18 +332,51 @@
                   <p>Us&aacute; lenguaje claro y operativo. Esto es lo que el cliente va a leer en su portal.</p>
                 </div>
               </div>
-              <label>Novedades encontradas
-                <textarea name="novedades" placeholder="Ej: No se observaron indicios de actividad de plagas al momento de la visita."></textarea>
-              </label>
-              <label>Recomendaciones / consejos
-                <textarea name="consejos" placeholder="Ej: Mantener orden, limpieza y evitar acumulaci&oacute;n de mercader&iacute;a contra paredes."></textarea>
-              </label>
-              <label>Resumen breve para el portal
-                <textarea name="resumenCliente" placeholder="Ej: Servicio realizado sin desv&iacute;os relevantes."></textarea>
-              </label>
-              <label>Detalle adicional opcional
-                <textarea name="contenido" placeholder="Detalle interno/publicable adicional si hace falta."></textarea>
-              </label>
+              <p class="muted">Selecciona una o varias opciones frecuentes y agrega texto propio si hace falta. El sistema combinara las opciones seleccionadas con el texto escrito.</p>
+
+              <div class="multi-text-block" data-combo-field="novedades" data-opciones-grupo="NOVEDAD_SERVICIO">
+                <div class="multi-text-head">
+                  <h4>Novedades encontradas</h4>
+                  <small>Seleccion multiple + texto libre</small>
+                </div>
+                <div class="multi-option-grid" data-combo-options="novedades"></div>
+                <label>Agregar novedad personalizada
+                  <textarea data-combo-free="novedades" placeholder="Ej: No se observaron indicios de actividad de plagas al momento de la visita."></textarea>
+                </label>
+              </div>
+
+              <div class="multi-text-block" data-combo-field="consejos" data-opciones-grupo="RECOMENDACION_SERVICIO">
+                <div class="multi-text-head">
+                  <h4>Recomendaciones / consejos</h4>
+                  <small>Seleccion multiple + texto libre</small>
+                </div>
+                <div class="multi-option-grid" data-combo-options="consejos"></div>
+                <label>Agregar recomendacion personalizada
+                  <textarea data-combo-free="consejos" placeholder="Ej: Mantener orden, limpieza y evitar acumulacion de mercaderia contra paredes."></textarea>
+                </label>
+              </div>
+
+              <div class="multi-text-block" data-combo-field="resumenCliente" data-opciones-grupo="RESUMEN_SERVICIO">
+                <div class="multi-text-head">
+                  <h4>Resumen breve para el portal</h4>
+                  <small>Seleccion multiple + texto libre</small>
+                </div>
+                <div class="multi-option-grid" data-combo-options="resumenCliente"></div>
+                <label>Agregar resumen personalizado
+                  <textarea data-combo-free="resumenCliente" placeholder="Ej: Servicio realizado sin desvios relevantes."></textarea>
+                </label>
+              </div>
+
+              <div class="multi-text-block" data-combo-field="contenido" data-opciones-grupo="DETALLE_SERVICIO">
+                <div class="multi-text-head">
+                  <h4>Detalle adicional opcional</h4>
+                  <small>Seleccion multiple + texto libre</small>
+                </div>
+                <div class="multi-option-grid" data-combo-options="contenido"></div>
+                <label>Agregar detalle personalizado
+                  <textarea data-combo-free="contenido" placeholder="Detalle interno/publicable adicional si hace falta."></textarea>
+                </label>
+              </div>
             </section>
 
             <section class="panel service-step">

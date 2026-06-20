@@ -1,4 +1,4 @@
-﻿function loginAdmin(pin) {
+function loginAdmin(pin) {
   const pinIngresado = normalizarTexto_(pin);
   const pinConfigurado = PropertiesService.getScriptProperties().getProperty('PORTAL_ADMIN_PIN');
 
@@ -416,28 +416,34 @@ function inicializarOpcionesPortalAdmin(adminToken) {
   const nombreHoja = PORTAL_CONFIG.HOJAS.OPCIONES;
   const headers = PORTAL_CONFIG.HEADERS[nombreHoja];
   const hoja = crearHojaPortalSiNoExiste_(ss, nombreHoja, headers);
+  const existentes = {};
 
   if (hoja.getLastRow() > 1) {
-    registrarLog('', '', 'INICIALIZAR_PORTAL_OPCIONES', 'OK', usuario + ' - hoja ya tenia opciones');
-    return {
-      ok: true,
-      mensaje: 'PORTAL_OPCIONES ya existe y tiene opciones cargadas.'
-    };
+    leerFilasPorHeaders_(hoja).forEach(function(row) {
+      const grupo = normalizarTexto_(row.GRUPO).toUpperCase();
+      const valor = normalizarTexto_(row.VALOR).toUpperCase();
+      if (grupo && valor) existentes[grupo + '||' + valor] = true;
+    });
   }
 
-  const filas = obtenerFilasOpcionesPortalDefault_();
+  const filas = obtenerFilasOpcionesPortalDefault_().filter(function(row) {
+    const grupo = normalizarTexto_(row.GRUPO).toUpperCase();
+    const valor = normalizarTexto_(row.VALOR).toUpperCase();
+    return grupo && valor && !existentes[grupo + '||' + valor];
+  });
+
   if (filas.length) {
-    hoja.getRange(2, 1, filas.length, headers.length).setValues(filas.map(function(row) {
+    hoja.getRange(hoja.getLastRow() + 1, 1, filas.length, headers.length).setValues(filas.map(function(row) {
       return headers.map(function(header) {
         return row[header] === undefined ? '' : row[header];
       });
     }));
   }
 
-  registrarLog('', '', 'INICIALIZAR_PORTAL_OPCIONES', 'OK', usuario + ' - opciones iniciales: ' + filas.length);
+  registrarLog('', '', 'INICIALIZAR_PORTAL_OPCIONES', 'OK', usuario + ' - opciones agregadas: ' + filas.length);
   return {
     ok: true,
-    mensaje: 'PORTAL_OPCIONES inicializada correctamente.',
+    mensaje: filas.length ? 'PORTAL_OPCIONES actualizada correctamente.' : 'PORTAL_OPCIONES ya estaba actualizada.',
     cantidad: filas.length
   };
 }
@@ -619,6 +625,41 @@ function obtenerFilasOpcionesPortalDefault_() {
     TIPO_PUNTO: ['Caja cebadera', 'Trampa mecanica', 'Placa adhesiva', 'Punto de inspeccion', 'Otro'],
     RESULTADO_MONITOREO: ['Sin actividad', 'Consumo bajo', 'Consumo medio', 'Consumo alto', 'Captura', 'Danada', 'Faltante', 'Reponer cebo', 'No inspeccionada'],
     ACCION_CORRECTIVA: ['No requiere', 'Se repuso cebo', 'Se reemplazo caja', 'Se limpio el punto', 'Se reforzo tratamiento', 'Informar al cliente'],
+    NOVEDAD_SERVICIO: [
+      'No se observaron indicios de actividad de plagas al momento de la visita.',
+      'No se registraron novedades relevantes durante el servicio.',
+      'Se detecto actividad compatible con presencia de plagas.',
+      'Se observaron posibles puntos de ingreso a corregir.',
+      'Se detecto consumo en cajas cebaderas.',
+      'Se observaron sectores con necesidad de mejorar orden y limpieza.',
+      'Se recomienda reforzar medidas preventivas en sectores criticos.'
+    ],
+    RECOMENDACION_SERVICIO: [
+      'Mantener orden y limpieza en sectores criticos.',
+      'Evitar acumulacion de mercaderia contra paredes.',
+      'Mantener alimentos e insumos correctamente cerrados.',
+      'Sellar aberturas, grietas o posibles puntos de ingreso.',
+      'Retirar residuos con frecuencia y mantener contenedores cerrados.',
+      'Evitar acumulacion de agua o humedad.',
+      'Informar cualquier indicio de actividad entre servicios.',
+      'Mantener despejado el acceso a cajas cebaderas y puntos de control.'
+    ],
+    RESUMEN_SERVICIO: [
+      'Servicio realizado sin desvios relevantes.',
+      'Servicio preventivo realizado correctamente.',
+      'Servicio realizado con novedades informadas.',
+      'Se realizo control preventivo y monitoreo de puntos.',
+      'Se realizo intervencion correctiva segun novedades detectadas.',
+      'Se recomienda mantener las medidas preventivas indicadas.'
+    ],
+    DETALLE_SERVICIO: [
+      'Se realizo inspeccion general de los sectores indicados.',
+      'Se efectuo control de puntos de monitoreo disponibles.',
+      'Se verifico el estado general de cajas cebaderas y dispositivos.',
+      'Se reforzo el tratamiento en sectores criticos.',
+      'Se dejaron recomendaciones preventivas al responsable del establecimiento.',
+      'No se observaron condiciones criticas al momento de la visita.'
+    ],
     TIPO_SERVICIO: ['Desinsectacion', 'Desratizacion', 'Monitoreo', 'Control integral', 'Visita tecnica'],
     CATEGORIA_PUBLICACION: ['Visita', 'Informe', 'Certificado', 'Comunicado'],
     ESTADO_PUBLICACION: ['PUBLICADO', 'BORRADOR'],

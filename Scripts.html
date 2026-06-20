@@ -18,10 +18,10 @@
   window.portalVisitaTituloManual = window.portalVisitaTituloManual || false;
   window.portalUltimaVisitaRapida = window.portalUltimaVisitaRapida || null;
   const ADMIN_TABS_CONFIG = [
+    { id: 'visitaRapida', label: 'Nuevo parte de servicio' },
     { id: 'clientes', label: 'Clientes' },
     { id: 'usuarios', label: 'Usuarios' },
-    { id: 'publicaciones', label: 'Visitas/Publicaciones' },
-    { id: 'visitaRapida', label: 'Nuevo parte de servicio' },
+    { id: 'publicaciones', label: 'Carga avanzada' },
     { id: 'plantillaPuntos', label: 'Plantilla de puntos' },
     { id: 'monitoreos', label: 'Monitoreos avanzado' },
     { id: 'documentos', label: 'Documentos' },
@@ -35,7 +35,42 @@
     CARACTER_SERVICIO: ['Servicio usual / programado', 'Emergencia', 'Reclamo', 'Auditoria'],
     TIPO_PUNTO: ['Caja cebadera', 'Trampa mecanica', 'Placa adhesiva', 'Punto de inspeccion', 'Otro'],
     RESULTADO_MONITOREO: ['Sin actividad', 'Consumo bajo', 'Consumo medio', 'Consumo alto', 'Captura', 'Danada', 'Faltante', 'Reponer cebo', 'No inspeccionada'],
-    ACCION_CORRECTIVA: ['No requiere', 'Se repuso cebo', 'Se reemplazo caja', 'Se limpio el punto', 'Se reforzo tratamiento', 'Informar al cliente']
+    ACCION_CORRECTIVA: ['No requiere', 'Se repuso cebo', 'Se reemplazo caja', 'Se limpio el punto', 'Se reforzo tratamiento', 'Informar al cliente'],
+    NOVEDAD_SERVICIO: [
+      'No se observaron indicios de actividad de plagas al momento de la visita.',
+      'No se registraron novedades relevantes durante el servicio.',
+      'Se detecto actividad compatible con presencia de plagas.',
+      'Se observaron posibles puntos de ingreso a corregir.',
+      'Se detecto consumo en cajas cebaderas.',
+      'Se observaron sectores con necesidad de mejorar orden y limpieza.',
+      'Se recomienda reforzar medidas preventivas en sectores criticos.'
+    ],
+    RECOMENDACION_SERVICIO: [
+      'Mantener orden y limpieza en sectores criticos.',
+      'Evitar acumulacion de mercaderia contra paredes.',
+      'Mantener alimentos e insumos correctamente cerrados.',
+      'Sellar aberturas, grietas o posibles puntos de ingreso.',
+      'Retirar residuos con frecuencia y mantener contenedores cerrados.',
+      'Evitar acumulacion de agua o humedad.',
+      'Informar cualquier indicio de actividad entre servicios.',
+      'Mantener despejado el acceso a cajas cebaderas y puntos de control.'
+    ],
+    RESUMEN_SERVICIO: [
+      'Servicio realizado sin desvios relevantes.',
+      'Servicio preventivo realizado correctamente.',
+      'Servicio realizado con novedades informadas.',
+      'Se realizo control preventivo y monitoreo de puntos.',
+      'Se realizo intervencion correctiva segun novedades detectadas.',
+      'Se recomienda mantener las medidas preventivas indicadas.'
+    ],
+    DETALLE_SERVICIO: [
+      'Se realizo inspeccion general de los sectores indicados.',
+      'Se efectuo control de puntos de monitoreo disponibles.',
+      'Se verifico el estado general de cajas cebaderas y dispositivos.',
+      'Se reforzo el tratamiento en sectores criticos.',
+      'Se dejaron recomendaciones preventivas al responsable del establecimiento.',
+      'No se observaron condiciones criticas al momento de la visita.'
+    ]
   };
 
   function setMessage(id, text, isError) {
@@ -290,7 +325,7 @@
         sessionStorage.setItem('portalAdminToken', res.token);
         setMessage('adminLoginMensaje', '');
         mostrarPanelAdmin();
-        mostrarAdminTab('clientes');
+        mostrarAdminTab('visitaRapida');
         recargarAdminListas();
       })
       .withFailureHandler(function(error) {
@@ -354,7 +389,7 @@
       if (typeof fn === 'function') fn();
     } catch (error) {
       console.error('Error cargando ' + nombre + ' admin', error);
-      setMessage('adminMensaje', 'No se pudo cargar ' + nombre + '. Las pestañas siguen disponibles.', true);
+      setMessage('adminMensaje', 'No se pudo cargar ' + nombre + '. Las pestanas siguen disponibles.', true);
     }
   }
 
@@ -368,6 +403,7 @@
     });
 
     const target = document.getElementById('adminTab-' + tab);
+    setMessage('adminMensaje', '');
     if (target) target.classList.remove('hidden');
     try {
       if (tab === 'visitaRapida' && !Object.keys(window.portalAdminOpciones || {}).length) {
@@ -384,8 +420,8 @@
         llenarOpcionesPlantillaPuntos();
       }
     } catch (error) {
-      console.error('Error preparando pestaña admin', tab, error);
-      setMessage('adminMensaje', 'La pestaña se abrió, pero hubo un problema preparando algunos datos. Revisá la consola o actualizá listas.', true);
+      console.error('Error preparando pestana admin', tab, error);
+      setMessage('adminMensaje', 'La pestana se abrio, pero hubo un problema preparando algunos datos. Revisa la consola o actualiza listas.', true);
     }
   }
 
@@ -449,9 +485,72 @@
     llenarSelectOpcionesPortal('selectVisitaServicio', 'SERVICIO', 'Selecciona servicio');
     llenarSelectOpcionesPortal('selectVisitaTipoIntervencion', 'TIPO_INTERVENCION', 'Selecciona tipo');
     llenarSelectOpcionesPortal('selectVisitaCaracterServicio', 'CARACTER_SERVICIO', 'Selecciona caracter');
+    llenarOpcionesTextoServicio();
     document.querySelectorAll('[data-opciones-grupo]').forEach(function(select) {
       llenarSelectOpcionesPortal(select.id, select.dataset.opcionesGrupo, select.dataset.placeholder || 'Selecciona opcion');
     });
+  }
+
+
+  function llenarOpcionesTextoServicio() {
+    document.querySelectorAll('[data-combo-field][data-opciones-grupo]').forEach(function(block) {
+      const campo = block.dataset.comboField;
+      const grupo = block.dataset.opcionesGrupo;
+      const target = block.querySelector('[data-combo-options]');
+      if (!campo || !grupo || !target) return;
+      const opciones = obtenerOpcionesPortalGrupo(grupo);
+      target.innerHTML = opciones.map(function(opcion, index) {
+        const id = 'combo-' + campo + '-' + index;
+        const valor = opcion.valor || opcion.etiqueta || '';
+        const etiqueta = opcion.etiqueta || opcion.valor || '';
+        return '<label class="multi-option-chip" for="' + esc(id) + '">' +
+          '<input id="' + esc(id) + '" type="checkbox" data-combo-check="' + esc(campo) + '" value="' + esc(valor) + '">' +
+          '<span>' + esc(etiqueta) + '</span>' +
+        '</label>';
+      }).join('');
+    });
+  }
+
+  function combinarOpcionesTextoServicio(campo) {
+    const valores = [];
+    const vistos = {};
+    document.querySelectorAll('[data-combo-check="' + campo + '"]:checked').forEach(function(input) {
+      agregarLineaTextoServicio_(valores, vistos, input.value);
+    });
+    const libre = document.querySelector('[data-combo-free="' + campo + '"]');
+    if (libre) agregarLineasTextoServicio_(valores, vistos, libre.value);
+    return valores.join('\n');
+  }
+
+  function prepararTextoInformeVisitaRapida(data) {
+    ['novedades', 'consejos', 'resumenCliente', 'contenido'].forEach(function(campo) {
+      const combinado = combinarOpcionesTextoServicio(campo);
+      if (combinado || !data[campo]) data[campo] = combinado;
+    });
+  }
+
+  function limpiarOpcionesTextoServicio() {
+    document.querySelectorAll('[data-combo-check]').forEach(function(input) {
+      input.checked = false;
+    });
+    document.querySelectorAll('[data-combo-free]').forEach(function(textarea) {
+      textarea.value = '';
+    });
+  }
+
+  function agregarLineasTextoServicio_(valores, vistos, texto) {
+    String(texto || '').split(/\r?\n/).forEach(function(linea) {
+      agregarLineaTextoServicio_(valores, vistos, linea);
+    });
+  }
+
+  function agregarLineaTextoServicio_(valores, vistos, texto) {
+    const limpio = String(texto || '').trim();
+    if (!limpio) return;
+    const key = limpio.toLowerCase();
+    if (vistos[key]) return;
+    vistos[key] = true;
+    valores.push(limpio);
   }
 
   function llenarSelectOpcionesPortal(selectId, grupo, placeholder) {
@@ -554,6 +653,7 @@
     }
 
     const data = formToObject(form);
+    prepararTextoInformeVisitaRapida(data);
     data.monitoreos = obtenerPuntosVisitaRapida();
     setMessage('adminMensaje', 'Guardando visita completa...');
     google.script.run
@@ -628,6 +728,7 @@
     window.portalUltimaVisitaRapida = null;
     agregarPuntoVisitaRapida();
     llenarOpcionesVisitaRapida();
+    limpiarOpcionesTextoServicio();
     actualizarModoPuntosVisitaRapida();
     actualizarPreviewVisitaRapida();
     const postSave = document.getElementById('visitaRapidaPostSave');
@@ -691,7 +792,7 @@
       ['Tipo de intervencion', obtenerTextoSelect(form.elements.tipoIntervencion) || 'Sin seleccionar'],
       ['Tipo de atencion', obtenerTextoSelect(form.elements.caracterServicio) || 'Sin seleccionar'],
       ['Titulo', data.titulo || 'Sin titulo'],
-      ['Resumen', data.resumenCliente || 'Sin resumen'],
+      ['Resumen', combinarOpcionesTextoServicio('resumenCliente') || data.resumenCliente || 'Sin resumen'],
       ['Cantidad de puntos cargados', String(cantidadPuntos)],
       ['Visible', data.visible || 'SI']
     ];
@@ -725,6 +826,7 @@
     }
 
     const data = formToObject(form);
+    prepararTextoInformeVisitaRapida(data);
     data.monitoreos = data.incluyePuntos === 'NO' ? [] : obtenerPuntosVisitaRapida();
     setMessage('adminMensaje', 'Guardando parte de servicio...');
     google.script.run
