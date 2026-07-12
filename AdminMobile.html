@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <base target="_top">
+    <?!= include('Styles'); ?>
+  </head>
+  <body class="mobile-admin-body">
+    <header class="mobile-admin-topbar">
+      <div class="brand-logo" aria-label="FUMTEX Servicios Integrales">
+        <span class="brand-mark">F</span>
+        <div class="brand-text">
+          <span class="brand-name">FUMTEX</span>
+          <span class="brand-subtitle">Servicios Integrales</span>
+        </div>
+      </div>
+      <button class="secondary-button mobile-small-button" type="button" onclick="cerrarSesionAdminMobile()">Salir</button>
+    </header>
+
+    <main class="mobile-admin-shell">
+      <section id="adminMobileLoginPanel" class="panel mobile-login-card">
+        <div class="brand-logo login-logo" aria-label="FUMTEX Servicios Integrales">
+          <span class="brand-mark">F</span>
+          <div class="brand-text">
+            <span class="brand-name">FUMTEX</span>
+            <span class="brand-subtitle">Servicios Integrales</span>
+          </div>
+        </div>
+        <span class="eyebrow">Admin movil</span>
+        <h1>Carga de servicio</h1>
+        <p class="muted">Carga rapida de parte de servicio FUMTEX.</p>
+        <form onsubmit="loginAdminMobileUi(event)">
+          <label>PIN admin
+            <input id="adminMobilePin" type="password" autocomplete="current-password" required>
+          </label>
+          <button class="mobile-primary-button" type="submit">Entrar</button>
+        </form>
+        <p id="adminMobileLoginMensaje" class="message"></p>
+      </section>
+
+      <section id="adminMobilePanel" class="hidden">
+        <div class="mobile-hero panel">
+          <span class="eyebrow">Admin movil</span>
+          <h1>Carga de servicio</h1>
+          <p>Carga rapida de parte de servicio FUMTEX.</p>
+        </div>
+
+        <nav class="mobile-action-tabs" aria-label="Acciones mobile">
+          <button type="button" class="active" data-mobile-section="parte" onclick="mostrarSeccionAdminMobile('parte')">Nuevo parte</button>
+          <button type="button" data-mobile-section="cliente" onclick="mostrarSeccionAdminMobile('cliente')">Cliente</button>
+          <button type="button" data-mobile-section="usuario" onclick="mostrarSeccionAdminMobile('usuario')">Usuario</button>
+          <button type="button" data-mobile-section="documento" onclick="mostrarSeccionAdminMobile('documento')">Documento</button>
+          <button type="button" data-mobile-section="vista" onclick="mostrarSeccionAdminMobile('vista')">Vista cliente</button>
+          <button type="button" data-mobile-section="pdf" onclick="mostrarSeccionAdminMobile('pdf')">Generar PDF</button>
+          <button type="button" data-mobile-section="puntos" onclick="mostrarSeccionAdminMobile('puntos')">Plantilla</button>
+        </nav>
+
+        <p id="adminMobileMensaje" class="message"></p>
+
+        <section id="adminMobileSection-parte" class="mobile-section">
+          <form id="adminMobileParteForm" class="mobile-wizard" onsubmit="guardarParteMobile(event)">
+            <div class="mobile-step-indicator">
+              <span id="adminMobileStepLabel">Paso 1 de 5</span>
+              <strong id="adminMobileStepTitle">Cliente y fecha</strong>
+            </div>
+
+            <div class="mobile-step" data-mobile-step="1">
+              <h2>Cliente y fecha</h2>
+              <label>Cliente
+                <select id="mobileSelectClienteParte" name="idPortalCliente" required>
+                  <option value="">Cargando clientes...</option>
+                </select>
+              </label>
+              <label>Fecha de visita
+                <input name="fechaVisita" type="date" required>
+              </label>
+              <label>Sucursal / sector
+                <input name="sucursal" placeholder="Ej: Local centro, deposito, planta">
+              </label>
+              <label>Visible en portal
+                <select name="visible">
+                  <option value="SI">SI</option>
+                  <option value="NO">NO</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="mobile-step hidden" data-mobile-step="2">
+              <h2>Servicio</h2>
+              <label>Servicio realizado
+                <select id="mobileSelectServicio" name="servicio" required></select>
+              </label>
+              <label>Tipo de intervencion
+                <select id="mobileSelectTipoIntervencion" name="tipoIntervencion" required></select>
+              </label>
+              <label>Caracter del servicio
+                <select id="mobileSelectCaracterServicio" name="caracterServicio" required></select>
+              </label>
+              <label>Titulo para cliente
+                <input name="titulo" placeholder="Ej: Informe de servicio preventivo">
+              </label>
+            </div>
+
+            <div class="mobile-step hidden" data-mobile-step="3">
+              <h2>Informe</h2>
+              <div class="multi-text-block mobile-combo-block" data-mobile-combo-field="novedades" data-opciones-grupo="NOVEDAD_SERVICIO">
+                <div class="multi-text-head"><strong>Novedades encontradas</strong><small>Elegir opciones y sumar texto libre</small></div>
+                <div class="multi-option-grid" data-mobile-combo-options></div>
+                <textarea data-mobile-combo-free="novedades" placeholder="Agregar novedad manual, una por linea"></textarea>
+              </div>
+              <div class="multi-text-block mobile-combo-block" data-mobile-combo-field="consejos" data-opciones-grupo="RECOMENDACION_SERVICIO">
+                <div class="multi-text-head"><strong>Recomendaciones / consejos</strong><small>Se combinan sin duplicados</small></div>
+                <div class="multi-option-grid" data-mobile-combo-options></div>
+                <textarea data-mobile-combo-free="consejos" placeholder="Agregar recomendacion manual, una por linea"></textarea>
+              </div>
+              <div class="multi-text-block mobile-combo-block" data-mobile-combo-field="resumenCliente" data-opciones-grupo="RESUMEN_SERVICIO">
+                <div class="multi-text-head"><strong>Resumen breve para portal</strong><small>Texto visible para el cliente</small></div>
+                <div class="multi-option-grid" data-mobile-combo-options></div>
+                <textarea data-mobile-combo-free="resumenCliente" placeholder="Resumen adicional"></textarea>
+              </div>
+              <div class="multi-text-block mobile-combo-block" data-mobile-combo-field="contenido" data-opciones-grupo="DETALLE_SERVICIO">
+                <div class="multi-text-head"><strong>Detalle adicional opcional</strong><small>Texto interno del informe</small></div>
+                <div class="multi-option-grid" data-mobile-combo-options></div>
+                <textarea data-mobile-combo-free="contenido" placeholder="Detalle adicional"></textarea>
+              </div>
+            </div>
+
+            <div class="mobile-step hidden" data-mobile-step="4">
+              <h2>Puntos controlados</h2>
+              <div class="mobile-stack-actions">
+                <button class="mobile-secondary-button" type="button" onclick="cargarPuntosClienteMobile()">Cargar puntos del cliente</button>
+                <button class="mobile-secondary-button" type="button" onclick="agregarPuntoMobile()">Agregar punto manual</button>
+              </div>
+              <div id="mobilePuntosLista" class="mobile-points-list"></div>
+            </div>
+
+            <div class="mobile-step hidden" data-mobile-step="5">
+              <h2>Revisar y guardar</h2>
+              <div id="mobileResumenParte" class="mobile-summary-card"></div>
+            </div>
+
+            <div class="mobile-wizard-nav">
+              <button class="secondary-button" type="button" onclick="mostrarPasoParteMobile(window.adminMobilePasoActual - 1)">Anterior</button>
+              <button id="mobileNextButton" class="mobile-primary-button" type="button" onclick="mostrarPasoParteMobile(window.adminMobilePasoActual + 1)">Siguiente</button>
+              <button id="mobileSaveButton" class="mobile-primary-button hidden" type="submit">Guardar parte de servicio</button>
+            </div>
+          </form>
+
+          <div id="mobilePostSave" class="panel mobile-post-save hidden">
+            <h2>Parte guardado correctamente</h2>
+            <p id="mobilePostSaveDetalle" class="muted"></p>
+            <div class="mobile-stack-actions">
+              <button class="mobile-secondary-button" type="button" onclick="verComoClienteMobile()">Ver como cliente</button>
+              <button class="mobile-secondary-button" type="button" onclick="generarPdfParteMobile()">Generar PDF</button>
+              <button class="mobile-primary-button" type="button" onclick="cargarOtroParteMobile()">Cargar otro parte</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="adminMobileSection-cliente" class="mobile-section hidden">
+          <div class="panel mobile-panel-card">
+            <h2>Cargar cliente</h2>
+            <form id="adminMobileClienteForm" onsubmit="guardarClienteMobile(event)">
+              <label>Razon social
+                <input name="razonSocial" placeholder="Nombre legal o razon social" required>
+              </label>
+              <label>Nombre fantasia
+                <input name="nombreFantasia" placeholder="Nombre visible">
+              </label>
+              <label>CUIT
+                <input name="cuit" inputmode="numeric" placeholder="Ej: 30700000000" required>
+              </label>
+              <label>Email principal
+                <input name="emailPrincipal" type="email" placeholder="cliente@email.com">
+              </label>
+              <label>Telefono
+                <input name="telefono" inputmode="tel" placeholder="Telefono o WhatsApp">
+              </label>
+              <label>Direccion
+                <input name="direccion" placeholder="Direccion del cliente">
+              </label>
+              <label>ID cliente origen
+                <input name="idClienteOrigen" placeholder="Opcional">
+              </label>
+              <label>Carpeta Drive ID
+                <input name="carpetaDriveId" placeholder="Opcional">
+              </label>
+              <label>Activo
+                <select name="activo">
+                  <option value="SI">SI</option>
+                  <option value="NO">NO</option>
+                </select>
+              </label>
+              <label>Observaciones
+                <textarea name="observaciones" placeholder="Notas internas"></textarea>
+              </label>
+              <button class="mobile-primary-button" type="submit">Guardar cliente</button>
+            </form>
+            <div id="mobileClienteResultado" class="mobile-card-list"></div>
+          </div>
+        </section>
+
+        <section id="adminMobileSection-usuario" class="mobile-section hidden">
+          <div class="panel mobile-panel-card">
+            <h2>Cargar usuario</h2>
+            <form id="adminMobileUsuarioForm" onsubmit="guardarUsuarioMobile(event)">
+              <label>Cliente
+                <select id="mobileSelectClienteUsuario" name="idPortalCliente" onchange="completarCuitUsuarioMobile()" required>
+                  <option value="">Selecciona cliente</option>
+                </select>
+              </label>
+              <label>CUIT
+                <input id="mobileUsuarioCuit" name="cuit" inputmode="numeric" required>
+              </label>
+              <label>Email de acceso
+                <input name="email" type="email" placeholder="usuario@email.com" required>
+              </label>
+              <label>Nombre
+                <input name="nombre" placeholder="Nombre del usuario">
+              </label>
+              <label>Rol
+                <input name="rol" value="CLIENTE">
+              </label>
+              <label>Clave temporal
+                <input name="claveTemporal" type="password" autocomplete="new-password" required>
+              </label>
+              <label>Activo
+                <select name="activo">
+                  <option value="SI">SI</option>
+                  <option value="NO">NO</option>
+                </select>
+              </label>
+              <button class="mobile-primary-button" type="submit">Guardar usuario</button>
+            </form>
+            <div id="mobileUsuarioResultado" class="mobile-card-list"></div>
+          </div>
+        </section>
+
+        <section id="adminMobileSection-documento" class="mobile-section hidden">
+          <div class="panel mobile-panel-card">
+            <h2>Cargar documento</h2>
+            <form id="adminMobileDocumentoForm" onsubmit="guardarDocumentoMobile(event)">
+              <label>Cliente
+                <select id="mobileSelectClienteDocumento" name="idPortalCliente" onchange="actualizarPublicacionesDocumentoMobile()" required>
+                  <option value="">Selecciona cliente</option>
+                </select>
+              </label>
+              <label>Visita / publicacion asociada
+                <select id="mobileSelectPublicacionDocumento" name="idPublicacion">
+                  <option value="">Documento general del cliente</option>
+                </select>
+              </label>
+              <label>Titulo
+                <input name="titulo" placeholder="Ej: Informe PDF" required>
+              </label>
+              <label>Tipo
+                <input name="tipo" placeholder="PDF, certificado, protocolo">
+              </label>
+              <label>URL del documento
+                <input name="url" type="url" placeholder="https://..." required>
+              </label>
+              <label>Carpeta Drive ID
+                <input name="carpetaDriveId" placeholder="Opcional">
+              </label>
+              <label>Descripcion
+                <textarea name="descripcion" placeholder="Descripcion visible para el cliente"></textarea>
+              </label>
+              <label>Visible
+                <select name="visible">
+                  <option value="SI">SI</option>
+                  <option value="NO">NO</option>
+                </select>
+              </label>
+              <button class="mobile-primary-button" type="submit">Guardar documento</button>
+            </form>
+            <div id="mobileDocumentoResultado" class="mobile-card-list"></div>
+          </div>
+        </section>
+
+        <section id="adminMobileSection-vista" class="mobile-section hidden">
+          <div class="panel mobile-panel-card">
+            <h2>Vista cliente</h2>
+            <label>Cliente
+              <select id="mobileSelectClienteVista">
+                <option value="">Selecciona cliente</option>
+              </select>
+            </label>
+            <button class="mobile-primary-button" type="button" onclick="cargarVistaClienteMobile()">Ver visitas</button>
+            <div id="mobileVistaClienteResultado" class="mobile-card-list"></div>
+          </div>
+        </section>
+
+        <section id="adminMobileSection-pdf" class="mobile-section hidden">
+          <div class="panel mobile-panel-card">
+            <h2>Generar PDF desde visita</h2>
+            <label>Cliente
+              <select id="mobileSelectClientePdf" onchange="actualizarPublicacionesPdfMobile()">
+                <option value="">Selecciona cliente</option>
+              </select>
+            </label>
+            <label>Visita / publicacion
+              <select id="mobileSelectPublicacionPdf">
+                <option value="">Selecciona publicacion</option>
+              </select>
+            </label>
+            <button class="mobile-primary-button" type="button" onclick="generarPdfDesdeSelectMobile()">Generar PDF</button>
+            <div id="mobilePdfResultado" class="mobile-card-list"></div>
+          </div>
+        </section>
+
+        <section id="adminMobileSection-puntos" class="mobile-section hidden">
+          <div class="panel mobile-panel-card">
+            <h2>Plantilla de puntos</h2>
+            <label>Cliente
+              <select id="mobileSelectClientePuntos">
+                <option value="">Selecciona cliente</option>
+              </select>
+            </label>
+            <button class="mobile-primary-button" type="button" onclick="cargarPlantillaPuntosMobile()">Cargar plantilla</button>
+            <div id="mobilePlantillaPuntosResultado" class="mobile-card-list"></div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <?!= include('Scripts'); ?>
+    <script>inicializarAdminMobile();</script>
+  </body>
+</html>

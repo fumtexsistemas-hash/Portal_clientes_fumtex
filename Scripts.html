@@ -109,33 +109,9 @@
 
   function inicializarPantallaCliente() {
     console.log('inicializarPantallaCliente');
+    limpiarDatosSesionPortal();
     mostrarLoginCliente();
-
-    try {
-      const params = new URLSearchParams(window.location.search || '');
-      if (params.get('logout') === '1' || params.get('forceLogin') === '1') {
-        console.log('logout detectado');
-        limpiarDatosSesionPortal();
-        mostrarLoginCliente();
-        setMessage('loginMensaje', 'Ingresa nuevamente para continuar.');
-        return;
-      }
-
-      const raw = sessionStorage.getItem('portalCliente');
-      if (!raw) return;
-
-      const cliente = JSON.parse(raw);
-      if (!cliente || !cliente.idPortalCliente || !cliente.token) return;
-
-      window.portalSession = cliente;
-      mostrarPanelCliente();
-      iniciarPortalCliente();
-    } catch (error) {
-      console.error('error recuperando sesion portal', error);
-      limpiarDatosSesionPortal();
-      mostrarLoginCliente();
-      setMessage('loginMensaje', 'No se pudo recuperar la sesion. Volve a ingresar.', true);
-    }
+    setMessage('loginMensaje', 'Ingresa con CUIT, email y clave para continuar.');
   }
 
   function mostrarLoginCliente() {
@@ -2449,4 +2425,628 @@ function ocultarBloqueClienteClasicoUi_(id) {
   var article = el.closest ? el.closest('article') : null;
   if (article) article.classList.add('hidden');
 }
+  window.adminMobilePasoActual = window.adminMobilePasoActual || 1;
+  window.adminMobilePuntos = window.adminMobilePuntos || [];
+  window.adminMobileUltimaPublicacion = window.adminMobileUltimaPublicacion || null;
+
+  function inicializarAdminMobile() {
+    console.log('inicializarAdminMobile');
+    limpiarSesionAdminMobileInicial_();
+    mostrarLoginAdminMobile();
+    setMessage('adminMobileLoginMensaje', 'Ingresa el PIN admin para continuar.');
+  }
+
+  function limpiarSesionAdminMobileInicial_() {
+    window.portalAdminToken = null;
+    sessionStorage.removeItem('portalAdminToken');
+    sessionStorage.removeItem('portalCliente');
+    sessionStorage.removeItem('portalToken');
+    sessionStorage.removeItem('idPortalCliente');
+  }
+
+  function mostrarLoginAdminMobile() {
+    const login = document.getElementById('adminMobileLoginPanel');
+    const panel = document.getElementById('adminMobilePanel');
+    if (login) login.classList.remove('hidden');
+    if (panel) panel.classList.add('hidden');
+  }
+
+  function mostrarPanelAdminMobile() {
+    const login = document.getElementById('adminMobileLoginPanel');
+    const panel = document.getElementById('adminMobilePanel');
+    if (login) login.classList.add('hidden');
+    if (panel) panel.classList.remove('hidden');
+    mostrarSeccionAdminMobile('parte');
+    mostrarPasoParteMobile(1);
+  }
+
+  function loginAdminMobileUi(event) {
+    event.preventDefault();
+    setMessage('adminMobileLoginMensaje', 'Validando PIN...');
+    const pin = document.getElementById('adminMobilePin').value;
+    google.script.run
+      .withSuccessHandler(function(res) {
+        console.log('respuesta loginAdmin mobile', res);
+        if (!res || !res.ok) {
+          setMessage('adminMobileLoginMensaje', res && res.mensaje ? res.mensaje : 'No se pudo ingresar.', true);
+          return;
+        }
+        window.portalAdminToken = res.token;
+        sessionStorage.setItem('portalAdminToken', res.token);
+        setMessage('adminMobileLoginMensaje', '');
+        mostrarPanelAdminMobile();
+        cargarDatosInicialesAdminMobile();
+      })
+      .withFailureHandler(function(error) {
+        console.error('error loginAdmin mobile', error);
+        setMessage('adminMobileLoginMensaje', error.message || String(error), true);
+      })
+      .loginAdmin(pin);
+  }
+
+  function cerrarSesionAdminMobile() {
+    window.portalAdminToken = null;
+    sessionStorage.removeItem('portalAdminToken');
+    setMessage('adminMobileMensaje', '');
+    setMessage('adminMobileLoginMensaje', 'Sesion admin cerrada.');
+    mostrarLoginAdminMobile();
+  }
+
+  function cargarDatosInicialesAdminMobile() {
+    cargarClientesAdminMobile();
+    cargarOpcionesAdminMobile();
+    cargarPublicacionesAdminMobile();
+  }
+
+  function mostrarSeccionAdminMobile(seccion) {
+    Array.prototype.forEach.call(document.querySelectorAll('.mobile-section'), function(panel) {
+      panel.classList.add('hidden');
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-mobile-section]'), function(button) {
+      button.classList.toggle('active', button.dataset.mobileSection === seccion);
+    });
+    const target = document.getElementById('adminMobileSection-' + seccion);
+    if (target) target.classList.remove('hidden');
+    setMessage('adminMobileMensaje', '');
+    if (seccion === 'parte') mostrarPasoParteMobile(window.adminMobilePasoActual || 1);
+    if (seccion === 'pdf') actualizarPublicacionesPdfMobile();
+    if (seccion === 'documento') actualizarPublicacionesDocumentoMobile();
+  }
+
+  function cargarClientesAdminMobile() {
+    const token = obtenerAdminToken();
+    if (!token) return;
+    google.script.run
+      .withSuccessHandler(function(res) {
+        window.portalAdminClientes = res && res.ok ? (res.clientes || []) : [];
+        llenarSelectsClientesMobile();
+        if (!window.portalAdminClientes.length) {
+          setMessage('adminMobileMensaje', 'No hay clientes cargados. Primero carga un cliente desde el Admin de escritorio.', true);
+        }
+      })
+      .withFailureHandler(function(error) {
+        console.error('error clientes mobile', error);
+        setMessage('adminMobileMensaje', error.message || String(error), true);
+      })
+      .listarClientesPortalAdmin(token);
+  }
+
+  function cargarOpcionesAdminMobile() {
+    const token = obtenerAdminToken();
+    if (!token) return;
+    google.script.run
+      .withSuccessHandler(function(res) {
+        window.portalAdminOpciones = normalizarOpcionesPortalAdmin(res && res.ok ? res.opciones : {});
+        llenarOpcionesMobile();
+      })
+      .withFailureHandler(function(error) {
+        console.error('error opciones mobile', error);
+        window.portalAdminOpciones = normalizarOpcionesPortalAdmin({});
+        llenarOpcionesMobile();
+        setMessage('adminMobileMensaje', 'No se pudieron cargar las opciones. Se usan opciones por defecto.', true);
+      })
+      .obtenerOpcionesPortalAdmin(token);
+  }
+
+  function cargarPublicacionesAdminMobile() {
+    const token = obtenerAdminToken();
+    if (!token) return;
+    google.script.run
+      .withSuccessHandler(function(res) {
+        window.portalAdminPublicaciones = res && res.ok ? (res.publicaciones || []) : [];
+        actualizarPublicacionesPdfMobile();
+      })
+      .withFailureHandler(function(error) {
+        console.error('error publicaciones mobile', error);
+      })
+      .listarPublicacionesPortalAdmin(token);
+  }
+
+  function llenarSelectsClientesMobile() {
+    const ids = [
+      'mobileSelectClienteParte',
+      'mobileSelectClienteVista',
+      'mobileSelectClientePdf',
+      'mobileSelectClientePuntos',
+      'mobileSelectClienteUsuario',
+      'mobileSelectClienteDocumento'
+    ];
+    ids.forEach(function(id) {
+      const select = document.getElementById(id);
+      if (!select) return;
+      const actual = select.value;
+      select.innerHTML = '';
+      select.appendChild(crearOption('', 'Selecciona cliente'));
+      (window.portalAdminClientes || []).forEach(function(cliente) {
+        select.appendChild(crearOption(cliente.idPortalCliente, textoClienteAdmin(cliente)));
+      });
+      if (actual) select.value = actual;
+    });
+    completarCuitUsuarioMobile();
+    actualizarPublicacionesDocumentoMobile();
+  }
+
+  function llenarOpcionesMobile() {
+    llenarSelectMobileOpciones('mobileSelectServicio', 'SERVICIO', 'Selecciona servicio');
+    llenarSelectMobileOpciones('mobileSelectTipoIntervencion', 'TIPO_INTERVENCION', 'Selecciona tipo');
+    llenarSelectMobileOpciones('mobileSelectCaracterServicio', 'CARACTER_SERVICIO', 'Selecciona caracter');
+    llenarCombosTextoMobile();
+    renderPuntosMobile();
+  }
+
+  function llenarSelectMobileOpciones(selectId, grupo, placeholder) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    const actual = select.value;
+    select.innerHTML = '';
+    select.appendChild(crearOption('', placeholder || 'Selecciona opcion'));
+    obtenerOpcionesPortalGrupo(grupo).forEach(function(opcion) {
+      select.appendChild(crearOption(opcion.valor, opcion.etiqueta || opcion.valor));
+    });
+    if (actual) select.value = actual;
+  }
+
+  function llenarCombosTextoMobile() {
+    document.querySelectorAll('[data-mobile-combo-field][data-opciones-grupo]').forEach(function(block) {
+      const campo = block.dataset.mobileComboField;
+      const grupo = block.dataset.opcionesGrupo;
+      const target = block.querySelector('[data-mobile-combo-options]');
+      if (!campo || !grupo || !target) return;
+      target.innerHTML = obtenerOpcionesPortalGrupo(grupo).map(function(opcion, index) {
+        const id = 'mobile-combo-' + campo + '-' + index;
+        const valor = opcion.valor || opcion.etiqueta || '';
+        const etiqueta = opcion.etiqueta || opcion.valor || '';
+        return '<label class="multi-option-chip" for="' + esc(id) + '">' +
+          '<input id="' + esc(id) + '" type="checkbox" data-mobile-combo-check="' + esc(campo) + '" value="' + esc(valor) + '">' +
+          '<span>' + esc(etiqueta) + '</span>' +
+        '</label>';
+      }).join('');
+    });
+  }
+
+  function mostrarPasoParteMobile(numero) {
+    const total = 5;
+    const paso = Math.max(1, Math.min(total, Number(numero) || 1));
+    window.adminMobilePasoActual = paso;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-mobile-step]'), function(panel) {
+      panel.classList.toggle('hidden', Number(panel.dataset.mobileStep) !== paso);
+    });
+    const titulos = ['Cliente y fecha', 'Servicio', 'Informe', 'Puntos controlados', 'Revisar y guardar'];
+    const label = document.getElementById('adminMobileStepLabel');
+    const title = document.getElementById('adminMobileStepTitle');
+    if (label) label.textContent = 'Paso ' + paso + ' de ' + total;
+    if (title) title.textContent = titulos[paso - 1];
+    const next = document.getElementById('mobileNextButton');
+    const save = document.getElementById('mobileSaveButton');
+    if (next) next.classList.toggle('hidden', paso === total);
+    if (save) save.classList.toggle('hidden', paso !== total);
+    if (paso === total) renderResumenParteMobile();
+    window.scrollTo(0, 0);
+  }
+
+  function cargarPuntosClienteMobile() {
+    const form = document.getElementById('adminMobileParteForm');
+    const idCliente = form && form.elements.idPortalCliente ? form.elements.idPortalCliente.value : '';
+    const token = obtenerAdminToken();
+    if (!idCliente) {
+      setMessage('adminMobileMensaje', 'Selecciona un cliente primero.', true);
+      mostrarPasoParteMobile(1);
+      return;
+    }
+    setMessage('adminMobileMensaje', 'Cargando puntos del cliente...');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        const puntos = res && res.ok ? (res.puntos || []) : [];
+        window.adminMobilePuntos = puntos.map(function(punto) {
+          return {
+            sector: punto.sector || '',
+            puntoControl: punto.puntoControl || '',
+            tipoPunto: punto.tipoPunto || '',
+            resultado: punto.resultadoDefault || 'Sin actividad',
+            novedad: '',
+            accionCorrectiva: punto.accionCorrectivaDefault || 'No requiere',
+            observaciones: punto.observaciones || ''
+          };
+        });
+        renderPuntosMobile();
+        setMessage('adminMobileMensaje', puntos.length ? 'Puntos cargados: ' + puntos.length : 'El cliente no tiene plantilla de puntos cargada.');
+      })
+      .withFailureHandler(function(error) {
+        setMessage('adminMobileMensaje', error.message || String(error), true);
+      })
+      .listarPuntosActivosClienteAdmin(idCliente, token);
+  }
+
+  function agregarPuntoMobile(data) {
+    window.adminMobilePuntos = window.adminMobilePuntos || [];
+    window.adminMobilePuntos.push(data || {
+      sector: '',
+      puntoControl: '',
+      tipoPunto: '',
+      resultado: 'Sin actividad',
+      novedad: '',
+      accionCorrectiva: 'No requiere',
+      observaciones: ''
+    });
+    renderPuntosMobile();
+  }
+
+  function quitarPuntoMobile(index) {
+    window.adminMobilePuntos.splice(index, 1);
+    renderPuntosMobile();
+  }
+
+  function actualizarPuntoMobile(index, campo, valor) {
+    if (!window.adminMobilePuntos[index]) return;
+    window.adminMobilePuntos[index][campo] = valor;
+  }
+
+  function renderPuntosMobile() {
+    const target = document.getElementById('mobilePuntosLista');
+    if (!target) return;
+    const puntos = window.adminMobilePuntos || [];
+    if (!puntos.length) {
+      target.innerHTML = '<p class="muted">Todavia no hay puntos cargados.</p>';
+      return;
+    }
+    target.innerHTML = puntos.map(function(punto, index) {
+      return '<article class="mobile-point-card">' +
+        '<div class="mobile-card-head"><strong>Punto ' + (index + 1) + '</strong><button type="button" class="secondary-button" onclick="quitarPuntoMobile(' + index + ')">Quitar</button></div>' +
+        mobileInputPunto_(index, 'sector', 'Sector', punto.sector) +
+        mobileInputPunto_(index, 'puntoControl', 'Punto', punto.puntoControl) +
+        mobileSelectPunto_(index, 'tipoPunto', 'Tipo', 'TIPO_PUNTO', punto.tipoPunto) +
+        mobileSelectPunto_(index, 'resultado', 'Resultado', 'RESULTADO_MONITOREO', punto.resultado) +
+        mobileTextareaPunto_(index, 'novedad', 'Novedad', punto.novedad) +
+        mobileSelectPunto_(index, 'accionCorrectiva', 'Accion correctiva', 'ACCION_CORRECTIVA', punto.accionCorrectiva) +
+        mobileTextareaPunto_(index, 'observaciones', 'Observaciones', punto.observaciones) +
+      '</article>';
+    }).join('');
+  }
+
+  function mobileInputPunto_(index, campo, label, value) {
+    return '<label>' + esc(label) + '<input value="' + esc(value || '') + '" onchange="actualizarPuntoMobile(' + index + ', \'' + campo + '\', this.value)"></label>';
+  }
+
+  function mobileTextareaPunto_(index, campo, label, value) {
+    return '<label>' + esc(label) + '<textarea onchange="actualizarPuntoMobile(' + index + ', \'' + campo + '\', this.value)">' + esc(value || '') + '</textarea></label>';
+  }
+
+  function mobileSelectPunto_(index, campo, label, grupo, value) {
+    const options = obtenerOpcionesPortalGrupo(grupo).map(function(opcion) {
+      const valor = opcion.valor || '';
+      return '<option value="' + esc(valor) + '"' + (valor === value ? ' selected' : '') + '>' + esc(opcion.etiqueta || valor) + '</option>';
+    }).join('');
+    return '<label>' + esc(label) + '<select onchange="actualizarPuntoMobile(' + index + ', \'' + campo + '\', this.value)">' + options + '</select></label>';
+  }
+
+  function combinarOpcionesTextoMobile(campo) {
+    const valores = [];
+    const vistos = {};
+    document.querySelectorAll('[data-mobile-combo-check="' + campo + '"]:checked').forEach(function(input) {
+      agregarLineaTextoServicio_(valores, vistos, input.value);
+    });
+    const libre = document.querySelector('[data-mobile-combo-free="' + campo + '"]');
+    if (libre) agregarLineasTextoServicio_(valores, vistos, libre.value);
+    return valores.join('\n');
+  }
+
+  function prepararTextoInformeMobile(data) {
+    ['novedades', 'consejos', 'resumenCliente', 'contenido'].forEach(function(campo) {
+      data[campo] = combinarOpcionesTextoMobile(campo);
+    });
+  }
+
+  function renderResumenParteMobile() {
+    const target = document.getElementById('mobileResumenParte');
+    const form = document.getElementById('adminMobileParteForm');
+    if (!target || !form) return;
+    const data = formToObject(form);
+    const cliente = obtenerClienteAdminPorId(data.idPortalCliente);
+    target.innerHTML = '<div><span>Cliente</span><strong>' + esc(cliente ? textoClienteAdmin(cliente) : 'Sin seleccionar') + '</strong></div>' +
+      '<div><span>Fecha</span><strong>' + esc(data.fechaVisita || 'Sin fecha') + '</strong></div>' +
+      '<div><span>Servicio</span><strong>' + esc(data.servicio || 'Sin servicio') + '</strong></div>' +
+      '<div><span>Cantidad de puntos</span><strong>' + esc(String((window.adminMobilePuntos || []).length)) + '</strong></div>' +
+      '<div><span>Visible</span><strong>' + esc(data.visible || 'SI') + '</strong></div>';
+  }
+
+  function guardarParteMobile(event) {
+    event.preventDefault();
+    const form = document.getElementById('adminMobileParteForm');
+    const token = obtenerAdminToken();
+    if (!token) {
+      mostrarLoginAdminMobile();
+      return;
+    }
+    const data = formToObject(form);
+    prepararTextoInformeMobile(data);
+    data.monitoreos = window.adminMobilePuntos || [];
+    setMessage('adminMobileMensaje', 'Guardando parte de servicio...');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          setMessage('adminMobileMensaje', res && res.mensaje ? res.mensaje : 'No se pudo guardar el parte.', true);
+          return;
+        }
+        window.adminMobileUltimaPublicacion = {
+          idPublicacion: res.idPublicacion,
+          idPortalCliente: data.idPortalCliente
+        };
+        const detalle = document.getElementById('mobilePostSaveDetalle');
+        if (detalle) detalle.textContent = 'Publicacion: ' + res.idPublicacion + '. Puntos cargados: ' + (res.cantidadMonitoreos || 0) + '.';
+        const post = document.getElementById('mobilePostSave');
+        if (post) post.classList.remove('hidden');
+        setMessage('adminMobileMensaje', 'Parte guardado correctamente.');
+        cargarPublicacionesAdminMobile();
+      })
+      .withFailureHandler(function(error) {
+        setMessage('adminMobileMensaje', error.message || String(error), true);
+      })
+      .crearVisitaRapidaAdmin(data, token);
+  }
+
+  function cargarOtroParteMobile() {
+    const form = document.getElementById('adminMobileParteForm');
+    if (form) form.reset();
+    window.adminMobilePuntos = [];
+    document.querySelectorAll('[data-mobile-combo-check]').forEach(function(input) { input.checked = false; });
+    document.querySelectorAll('[data-mobile-combo-free]').forEach(function(textarea) { textarea.value = ''; });
+    const post = document.getElementById('mobilePostSave');
+    if (post) post.classList.add('hidden');
+    renderPuntosMobile();
+    mostrarPasoParteMobile(1);
+  }
+
+  function verComoClienteMobile() {
+    mostrarSeccionAdminMobile('vista');
+    const id = window.adminMobileUltimaPublicacion && window.adminMobileUltimaPublicacion.idPortalCliente;
+    const select = document.getElementById('mobileSelectClienteVista');
+    if (select && id) select.value = id;
+    if (id) cargarVistaClienteMobile();
+  }
+
+  function cargarVistaClienteMobile() {
+    const idCliente = document.getElementById('mobileSelectClienteVista').value;
+    const token = obtenerAdminToken();
+    const target = document.getElementById('mobileVistaClienteResultado');
+    if (!idCliente) {
+      if (target) target.innerHTML = '<p class="muted">Selecciona un cliente.</p>';
+      return;
+    }
+    if (target) target.innerHTML = '<p class="muted">Cargando visitas...</p>';
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          target.innerHTML = '<p class="message error">No se pudo cargar la vista.</p>';
+          return;
+        }
+        const publicaciones = res.publicaciones || [];
+        const documentos = res.documentos || [];
+        target.innerHTML = renderVistaClienteMobile_(res.cliente, publicaciones, documentos);
+      })
+      .withFailureHandler(function(error) {
+        target.innerHTML = '<p class="message error">' + esc(error.message || String(error)) + '</p>';
+      })
+      .obtenerVistaClienteAdmin(idCliente, token);
+  }
+
+  function renderVistaClienteMobile_(cliente, publicaciones, documentos) {
+    const header = '<article class="mobile-result-card"><strong>' + esc(cliente && (cliente.razonSocial || cliente.nombreFantasia) || 'Cliente') + '</strong><small>CUIT: ' + esc(cliente && cliente.cuit || '') + '</small></article>';
+    const cards = publicaciones.length ? publicaciones.map(function(pub) {
+      const docs = documentos.filter(function(doc) { return doc.idPublicacion === pub.idPublicacion; });
+      return '<article class="mobile-result-card"><span>' + esc(pub.fechaVisita || '') + '</span><strong>' + esc(pub.titulo || pub.tipoServicio || 'Visita') + '</strong><p>' + esc(pub.resumenCliente || '') + '</p>' +
+        '<button type="button" class="mobile-secondary-button" onclick="generarPdfParteMobile(\'' + esc(pub.idPublicacion) + '\')">Generar PDF</button>' +
+        docs.map(function(doc) { return '<a class="mobile-link-button" target="_blank" href="' + esc(doc.url || '') + '">Abrir PDF</a>'; }).join('') +
+      '</article>';
+    }).join('') : '<p class="muted">Sin publicaciones visibles.</p>';
+    return header + cards;
+  }
+
+  function actualizarPublicacionesPdfMobile() {
+    const clienteSelect = document.getElementById('mobileSelectClientePdf');
+    const pubSelect = document.getElementById('mobileSelectPublicacionPdf');
+    if (!clienteSelect || !pubSelect) return;
+    const idCliente = clienteSelect.value;
+    pubSelect.innerHTML = '';
+    pubSelect.appendChild(crearOption('', 'Selecciona publicacion'));
+    (window.portalAdminPublicaciones || []).filter(function(pub) {
+      return !idCliente || pub.idPortalCliente === idCliente;
+    }).forEach(function(pub) {
+      pubSelect.appendChild(crearOption(pub.idPublicacion, textoPublicacionMobile_(pub)));
+    });
+  }
+
+  function actualizarPublicacionesDocumentoMobile() {
+    const clienteSelect = document.getElementById('mobileSelectClienteDocumento');
+    const pubSelect = document.getElementById('mobileSelectPublicacionDocumento');
+    if (!clienteSelect || !pubSelect) return;
+    const idCliente = clienteSelect.value;
+    const actual = pubSelect.value;
+    pubSelect.innerHTML = '';
+    pubSelect.appendChild(crearOption('', 'Documento general del cliente'));
+    (window.portalAdminPublicaciones || []).filter(function(pub) {
+      return !idCliente || pub.idPortalCliente === idCliente;
+    }).forEach(function(pub) {
+      pubSelect.appendChild(crearOption(pub.idPublicacion, textoPublicacionMobile_(pub)));
+    });
+    if (actual) pubSelect.value = actual;
+  }
+
+  function completarCuitUsuarioMobile() {
+    const select = document.getElementById('mobileSelectClienteUsuario');
+    const input = document.getElementById('mobileUsuarioCuit');
+    if (!select || !input) return;
+    const cliente = obtenerClienteAdminPorId(select.value);
+    if (cliente && cliente.cuit) input.value = cliente.cuit;
+  }
+
+  function guardarClienteMobile(event) {
+    event.preventDefault();
+    const form = document.getElementById('adminMobileClienteForm');
+    const target = document.getElementById('mobileClienteResultado');
+    const token = obtenerAdminToken();
+    if (!token) {
+      mostrarLoginAdminMobile();
+      return;
+    }
+    const data = formToObject(form);
+    setMessage('adminMobileMensaje', 'Guardando cliente...');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          setMessage('adminMobileMensaje', res && res.mensaje ? res.mensaje : 'No se pudo guardar el cliente.', true);
+          return;
+        }
+        setMessage('adminMobileMensaje', res.mensaje || 'Cliente guardado.');
+        if (target) {
+          target.innerHTML = '<article class="mobile-result-card"><strong>Cliente creado</strong><p>ID: ' + esc(res.id || '') + '</p></article>';
+        }
+        if (form) form.reset();
+        cargarClientesAdminMobile();
+      })
+      .withFailureHandler(function(error) {
+        setMessage('adminMobileMensaje', error.message || String(error), true);
+      })
+      .crearClientePortalAdmin(data, token);
+  }
+
+  function guardarUsuarioMobile(event) {
+    event.preventDefault();
+    const form = document.getElementById('adminMobileUsuarioForm');
+    const target = document.getElementById('mobileUsuarioResultado');
+    const token = obtenerAdminToken();
+    if (!token) {
+      mostrarLoginAdminMobile();
+      return;
+    }
+    const data = formToObject(form);
+    setMessage('adminMobileMensaje', 'Guardando usuario...');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          setMessage('adminMobileMensaje', res && res.mensaje ? res.mensaje : 'No se pudo guardar el usuario.', true);
+          return;
+        }
+        setMessage('adminMobileMensaje', res.mensaje || 'Usuario guardado.');
+        if (target) {
+          target.innerHTML = '<article class="mobile-result-card"><strong>Usuario creado</strong><p>ID: ' + esc(res.id || '') + '</p></article>';
+        }
+        if (form) form.reset();
+        completarCuitUsuarioMobile();
+      })
+      .withFailureHandler(function(error) {
+        setMessage('adminMobileMensaje', error.message || String(error), true);
+      })
+      .crearUsuarioPortalAdmin(data, token);
+  }
+
+  function guardarDocumentoMobile(event) {
+    event.preventDefault();
+    const form = document.getElementById('adminMobileDocumentoForm');
+    const target = document.getElementById('mobileDocumentoResultado');
+    const token = obtenerAdminToken();
+    if (!token) {
+      mostrarLoginAdminMobile();
+      return;
+    }
+    const data = formToObject(form);
+    setMessage('adminMobileMensaje', 'Guardando documento...');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          setMessage('adminMobileMensaje', res && res.mensaje ? res.mensaje : 'No se pudo guardar el documento.', true);
+          return;
+        }
+        setMessage('adminMobileMensaje', res.mensaje || 'Documento guardado.');
+        if (target) {
+          target.innerHTML = '<article class="mobile-result-card"><strong>Documento creado</strong><p>ID: ' + esc(res.id || '') + '</p></article>';
+        }
+        if (form) form.reset();
+      })
+      .withFailureHandler(function(error) {
+        setMessage('adminMobileMensaje', error.message || String(error), true);
+      })
+      .crearDocumentoAdmin(data, token);
+  }
+
+  function textoPublicacionMobile_(pub) {
+    return [pub.fechaVisita, pub.tipoServicio, pub.sucursal, pub.idPublicacion].filter(Boolean).join(' - ');
+  }
+
+  function generarPdfDesdeSelectMobile() {
+    const id = document.getElementById('mobileSelectPublicacionPdf').value;
+    if (!id) {
+      setMessage('adminMobileMensaje', 'Selecciona una publicacion.', true);
+      return;
+    }
+    generarPdfParteMobile(id);
+  }
+
+  function generarPdfParteMobile(idPublicacion) {
+    const id = idPublicacion || (window.adminMobileUltimaPublicacion && window.adminMobileUltimaPublicacion.idPublicacion) || '';
+    const token = obtenerAdminToken();
+    const target = document.getElementById('mobilePdfResultado');
+    if (!id) {
+      setMessage('adminMobileMensaje', 'No hay una publicacion para generar PDF.', true);
+      return;
+    }
+    setMessage('adminMobileMensaje', 'Generando PDF...');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.ok) {
+          setMessage('adminMobileMensaje', res && res.mensaje ? res.mensaje : 'No se pudo generar PDF.', true);
+          return;
+        }
+        setMessage('adminMobileMensaje', res.mensaje || 'PDF generado correctamente.');
+        if (target) {
+          target.innerHTML = '<article class="mobile-result-card"><strong>' + esc(res.nombreArchivo || 'PDF generado') + '</strong><a class="mobile-link-button" target="_blank" href="' + esc(res.url || '') + '">Abrir PDF</a></article>';
+        }
+        cargarPublicacionesAdminMobile();
+      })
+      .withFailureHandler(function(error) {
+        setMessage('adminMobileMensaje', error.message || String(error), true);
+      })
+      .generarPdfParteServicioAdmin(id, token);
+  }
+
+  function cargarPlantillaPuntosMobile() {
+    const idCliente = document.getElementById('mobileSelectClientePuntos').value;
+    const token = obtenerAdminToken();
+    const target = document.getElementById('mobilePlantillaPuntosResultado');
+    if (!idCliente) {
+      if (target) target.innerHTML = '<p class="muted">Selecciona un cliente.</p>';
+      return;
+    }
+    if (target) target.innerHTML = '<p class="muted">Cargando plantilla...</p>';
+    google.script.run
+      .withSuccessHandler(function(res) {
+        const puntos = res && res.ok ? (res.puntos || []) : [];
+        target.innerHTML = puntos.length ? puntos.map(function(punto) {
+          return '<article class="mobile-result-card"><strong>' + esc(punto.sector || '') + ' - ' + esc(punto.puntoControl || '') + '</strong><small>' + esc(punto.tipoPunto || '') + '</small><p>' + esc(punto.resultadoDefault || '') + ' / ' + esc(punto.accionCorrectivaDefault || '') + '</p></article>';
+        }).join('') : '<p class="muted">Sin puntos activos para este cliente.</p>';
+      })
+      .withFailureHandler(function(error) {
+        target.innerHTML = '<p class="message error">' + esc(error.message || String(error)) + '</p>';
+      })
+      .listarPuntosActivosClienteAdmin(idCliente, token);
+  }
 </script>

@@ -1,7 +1,9 @@
 function doGet(e) {
-  const app = e && e.parameter ? String(e.parameter.app || '').toLowerCase() : '';
+  const params = e && e.parameter ? e.parameter : {};
+  const app = String(params.app || '').toLowerCase();
+  const modo = String(params.modo || '').toLowerCase();
   const templateName = app === 'admin'
-    ? 'Admin'
+    ? (modo === 'mobile' ? 'AdminMobile' : 'Admin')
     : 'Cliente';
 
   return HtmlService
