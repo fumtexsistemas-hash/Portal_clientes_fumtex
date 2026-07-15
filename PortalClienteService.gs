@@ -83,7 +83,8 @@ function obtenerRegistrosVisiblesCliente_(nombreHoja, idPortalCliente, token, ca
 
     return { ok: true, items: items };
   } catch (error) {
-    return { ok: false, mensaje: error.message, items: [] };
+    registrarLog('', id, 'CONSULTA_CLIENTE', 'ERROR', error.message);
+    return { ok: false, mensaje: 'No se pudo cargar la informacion. Intenta nuevamente mas tarde.', items: [] };
   }
 }
 

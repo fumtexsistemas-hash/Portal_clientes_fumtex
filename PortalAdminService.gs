@@ -1,16 +1,26 @@
 function loginAdmin(pin) {
   const pinIngresado = normalizarTexto_(pin);
+  const rateLimitKey = crearClaveRateLimitLogin_('ADMIN', 'ADMIN');
+
+  if (estaBloqueadoLogin_(rateLimitKey)) {
+    registrarLog('', '', 'LOGIN_ADMIN', 'BLOQUEADO', 'Limite temporal de intentos alcanzado');
+    return { ok: false, mensaje: 'Demasiados intentos. Espera 10 minutos antes de volver a intentar.' };
+  }
+
   const pinConfigurado = PropertiesService.getScriptProperties().getProperty('PORTAL_ADMIN_PIN');
 
   if (!pinConfigurado) {
-    return { ok: false, mensaje: 'No existe PORTAL_ADMIN_PIN en Script Properties.' };
+    registrarLog('', '', 'LOGIN_ADMIN', 'ERROR', 'Configuracion de PIN no disponible');
+    return { ok: false, mensaje: 'No se pudo iniciar sesion. Intenta nuevamente mas tarde.' };
   }
 
   if (!pinIngresado || pinIngresado !== String(pinConfigurado)) {
     registrarLog('', '', 'LOGIN_ADMIN', 'ERROR', 'PIN invalido');
-    return { ok: false, mensaje: 'PIN admin invalido.' };
+    registrarIntentoFallidoLogin_(rateLimitKey);
+    return { ok: false, mensaje: 'No se pudo iniciar sesion. Verifica los datos ingresados.' };
   }
 
+  limpiarIntentosLogin_(rateLimitKey);
   const token = Utilities.getUuid();
   const payload = JSON.stringify({
     usuario: 'ADMIN_PORTAL',
@@ -103,7 +113,7 @@ function crearPublicacionAdmin(data, adminToken) {
     RESUMEN_CLIENTE: normalizarTexto_(data.resumenCliente),
     CONTENIDO: normalizarTexto_(data.contenido),
     VISIBLE: normalizarSiNo_(data.visible),
-    FECHA_CARGA: fechaCarga,
+    FECHA_CARGA: data.fechaCarga ? new Date(data.fechaCarga) : new Date(),
     FECHA_PUBLICACION: data.fechaPublicacion ? new Date(data.fechaPublicacion) : new Date(),
     USUARIO_CARGA: usuario
   };
@@ -984,7 +994,8 @@ function configurarPermisoPdfPublico_(archivoPdf) {
   );
 }
 
-function autorizarModuloPdfPortalClientes() {
+function autorizarModuloPdfPortalClientes(adminToken) {
+  const usuario = validarAdminToken_(adminToken);
   const doc = DocumentApp.create('FUMTEX_Autorizacion_Modulo_PDF_Temporal');
   doc.getBody().appendParagraph('Autorizacion temporal del modulo PDF Portal Clientes FUMTEX.');
   doc.saveAndClose();
@@ -998,7 +1009,7 @@ function autorizarModuloPdfPortalClientes() {
   docFile.setTrashed(true);
   pdfFile.setTrashed(true);
 
-  Logger.log('Modulo PDF autorizado correctamente');
+  registrarLog('', '', 'AUTORIZAR_MODULO_PDF', 'OK', usuario);
   return 'Modulo PDF autorizado correctamente';
 }
 

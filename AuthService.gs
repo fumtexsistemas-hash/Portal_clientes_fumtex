@@ -2,10 +2,16 @@ function loginCliente(cuit, email, clave) {
   const cuitLimpio = normalizarTexto_(cuit);
   const emailLimpio = normalizarClave_(email);
   const claveLimpia = normalizarTexto_(clave);
+  const rateLimitKey = crearClaveRateLimitLogin_('CLIENTE', cuitLimpio + '|' + emailLimpio);
 
   if (!cuitLimpio || !emailLimpio || !claveLimpia) {
     registrarLog(emailLimpio, '', 'LOGIN_CLIENTE', 'ERROR', 'Parametros vacios');
     return { ok: false, mensaje: 'Completa CUIT, email y clave.' };
+  }
+
+  if (estaBloqueadoLogin_(rateLimitKey)) {
+    registrarLog(emailLimpio, '', 'LOGIN_CLIENTE', 'BLOQUEADO', 'Limite temporal de intentos alcanzado');
+    return { ok: false, mensaje: 'Demasiados intentos. Espera 10 minutos antes de volver a intentar.' };
   }
 
   try {
@@ -22,15 +28,18 @@ function loginCliente(cuit, email, clave) {
 
     if (!usuario) {
       registrarLog(emailLimpio, '', 'LOGIN_CLIENTE', 'ERROR', 'Credenciales invalidas o usuario inactivo');
-      return { ok: false, mensaje: 'Credenciales invalidas o usuario inactivo.' };
+      registrarIntentoFallidoLogin_(rateLimitKey);
+      return { ok: false, mensaje: 'No se pudo iniciar sesion. Verifica los datos ingresados.' };
     }
 
     const cliente = obtenerClientePortalPorId_(usuario.ID_PORTAL_CLIENTE);
     if (!cliente || !esSi_(cliente.ACTIVO)) {
       registrarLog(emailLimpio, usuario.ID_PORTAL_CLIENTE, 'LOGIN_CLIENTE', 'ERROR', 'Cliente inactivo o inexistente');
-      return { ok: false, mensaje: 'Cliente inactivo o no disponible.' };
+      registrarIntentoFallidoLogin_(rateLimitKey);
+      return { ok: false, mensaje: 'No se pudo iniciar sesion. Verifica los datos ingresados.' };
     }
 
+    limpiarIntentosLogin_(rateLimitKey);
     const token = crearSesionCliente_(usuario.ID_PORTAL_CLIENTE, emailLimpio);
     registrarLog(emailLimpio, usuario.ID_PORTAL_CLIENTE, 'LOGIN_CLIENTE', 'OK', 'Acceso correcto');
     return {
@@ -47,8 +56,29 @@ function loginCliente(cuit, email, clave) {
     };
   } catch (error) {
     registrarLog(emailLimpio, '', 'LOGIN_CLIENTE', 'ERROR', error.message);
-    return { ok: false, mensaje: 'No se pudo iniciar sesion. Detalle: ' + error.message };
+    return { ok: false, mensaje: 'No se pudo iniciar sesion. Intenta nuevamente mas tarde.' };
   }
+}
+
+function crearClaveRateLimitLogin_(tipo, identificador) {
+  const hashIdentificador = hashClave_(normalizarClave_(identificador)).slice(0, 24);
+  return 'LOGIN_FAIL_' + normalizarTexto_(tipo).toUpperCase() + '_' + hashIdentificador;
+}
+
+function estaBloqueadoLogin_(cacheKey) {
+  const intentos = Number(CacheService.getScriptCache().get(cacheKey) || 0);
+  return intentos >= 5;
+}
+
+function registrarIntentoFallidoLogin_(cacheKey) {
+  const cache = CacheService.getScriptCache();
+  const intentos = Number(cache.get(cacheKey) || 0) + 1;
+  cache.put(cacheKey, String(intentos), 10 * 60);
+  return intentos;
+}
+
+function limpiarIntentosLogin_(cacheKey) {
+  CacheService.getScriptCache().remove(cacheKey);
 }
 
 function obtenerClientePortalPorId_(idPortalCliente) {

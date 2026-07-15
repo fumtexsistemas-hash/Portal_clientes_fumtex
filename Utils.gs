@@ -12,6 +12,6 @@
 
   props.deleteProperty('TEMP_CLAVE_PORTAL');
 
-  Logger.log('CLAVE_HASH generado: ' + hash);
+  Logger.log('CLAVE_HASH generado correctamente.');
   return hash;
 }
