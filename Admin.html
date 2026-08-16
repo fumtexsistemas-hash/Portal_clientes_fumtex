@@ -54,19 +54,29 @@
         </section>
 
         <nav class="admin-tabs" aria-label="Secciones admin">
-          <button type="button" class="admin-tab" data-admin-tab="clientes" onclick="mostrarAdminTab('clientes')">Clientes</button>
-          <button type="button" class="admin-tab" data-admin-tab="usuarios" onclick="mostrarAdminTab('usuarios')">Usuarios</button>
-          <button type="button" class="admin-tab" data-admin-tab="publicaciones" onclick="mostrarAdminTab('publicaciones')">Carga avanzada</button>
-          <button type="button" class="admin-tab active" data-admin-tab="visitaRapida" onclick="mostrarAdminTab('visitaRapida')">Nuevo parte de servicio</button>
-          <button type="button" class="admin-tab" data-admin-tab="plantillaPuntos" onclick="mostrarAdminTab('plantillaPuntos')">Plantilla de puntos</button>
-          <button type="button" class="admin-tab" data-admin-tab="monitoreos" onclick="mostrarAdminTab('monitoreos')">Monitoreos avanzado</button>
-          <button type="button" class="admin-tab" data-admin-tab="documentos" onclick="mostrarAdminTab('documentos')">Documentos</button>
-          <button type="button" class="admin-tab" data-admin-tab="vistaCliente" onclick="mostrarAdminTab('vistaCliente')">Vista cliente</button>
-          <button type="button" class="admin-tab" data-admin-tab="visibilidad" onclick="mostrarAdminTab('visibilidad')">Gestionar visibilidad</button>
-          <button type="button" class="admin-tab" data-admin-tab="editarRegistros" onclick="mostrarAdminTab('editarRegistros')">Editar registros</button>
+          <div class="admin-tab-group admin-tab-group-primary">
+            <span class="admin-tab-group-label">Flujo principal</span>
+            <div class="admin-tab-actions">
+              <button type="button" class="admin-tab active" data-admin-tab="visitaRapida" onclick="mostrarAdminTab('visitaRapida')">Nuevo parte de servicio</button>
+              <button type="button" class="admin-tab" data-admin-tab="vistaCliente" onclick="mostrarAdminTab('vistaCliente')">Vista cliente</button>
+              <button type="button" class="admin-tab" data-admin-tab="documentos" onclick="mostrarAdminTab('documentos')">Generar PDF / Documentos</button>
+              <button type="button" class="admin-tab" data-admin-tab="plantillaPuntos" onclick="mostrarAdminTab('plantillaPuntos')">Plantilla de puntos</button>
+            </div>
+          </div>
+          <details class="admin-tab-group admin-tab-group-secondary">
+            <summary class="admin-tab-group-label">Opciones avanzadas</summary>
+            <div class="admin-tab-actions">
+              <button type="button" class="admin-tab" data-admin-tab="clientes" onclick="mostrarAdminTab('clientes')">Clientes</button>
+              <button type="button" class="admin-tab" data-admin-tab="usuarios" onclick="mostrarAdminTab('usuarios')">Usuarios</button>
+              <button type="button" class="admin-tab" data-admin-tab="publicaciones" onclick="mostrarAdminTab('publicaciones')">Carga avanzada</button>
+              <button type="button" class="admin-tab" data-admin-tab="monitoreos" onclick="mostrarAdminTab('monitoreos')">Monitoreos avanzado</button>
+              <button type="button" class="admin-tab" data-admin-tab="visibilidad" onclick="mostrarAdminTab('visibilidad')">Gestionar visibilidad</button>
+              <button type="button" class="admin-tab" data-admin-tab="editarRegistros" onclick="mostrarAdminTab('editarRegistros')">Editar registros</button>
+            </div>
+          </details>
         </nav>
 
-        <p id="adminMensaje" class="message"></p>
+        <p id="adminMensaje" class="message" aria-live="polite"></p>
 
         <section id="adminTab-clientes" class="admin-tab-panel hidden">
           <form class="panel admin-form" onsubmit="crearClientePortalUi(event)">
@@ -110,7 +120,15 @@
           </form>
 
           <section class="panel">
-            <h3>Clientes cargados</h3>
+            <div class="visibility-item">
+              <div>
+                <h3>Clientes cargados</h3>
+                <small id="adminClientesContador">Sin datos cargados</small>
+              </div>
+              <label class="admin-search-label">Buscar cliente
+                <input id="adminClientesBuscar" type="search" placeholder="Nombre, CUIT, email o ID" oninput="filtrarClientesAdmin()">
+              </label>
+            </div>
             <div id="adminClientesLista" class="list">
               <p class="muted">Ingres&aacute; con PIN para ver clientes.</p>
             </div>
@@ -261,7 +279,7 @@
         </section>
 
         <section id="adminTab-visitaRapida" class="admin-tab-panel">
-          <form id="formVisitaRapida" class="admin-form service-wizard" onsubmit="crearVisitaRapidaUi(event)" oninput="actualizarPreviewVisitaRapida()" onchange="actualizarPreviewVisitaRapida()">
+          <form id="formVisitaRapida" class="admin-form service-wizard" onsubmit="crearVisitaRapidaUi(event)" oninput="marcarVisitaRapidaSucia()" onchange="marcarVisitaRapidaSucia()">
             <section class="panel service-hero">
               <div>
                 <span class="eyebrow">Portal Clientes FUMTEX</span>
@@ -422,7 +440,7 @@
               </div>
               <div class="inline-actions service-actions">
                 <button class="secondary-button" type="button" onclick="limpiarVisitaRapida()">Limpiar formulario</button>
-                <button type="submit">Guardar parte de servicio</button>
+                <button id="btnGuardarVisitaRapida" type="submit">Guardar parte de servicio</button>
               </div>
             </section>
           </form>
@@ -492,8 +510,30 @@
         </section>
 
         <section id="adminTab-documentos" class="admin-tab-panel hidden">
+          <section class="panel admin-form">
+            <h2>Generar PDF del parte de servicio</h2>
+            <p class="muted">Seleccion&aacute; un cliente y uno de sus partes guardados. El PDF se publicar&aacute; como documento visible en el portal del cliente.</p>
+            <div class="form-grid">
+              <label>Cliente
+                <select id="selectClientePdf" onchange="actualizarSelectPublicacionesPorCliente('selectClientePdf', 'selectPublicacionPdf', false)">
+                  <option value="">Cargando clientes...</option>
+                </select>
+              </label>
+              <label>Parte de servicio
+                <select id="selectPublicacionPdf">
+                  <option value="">Seleccion&aacute; primero un cliente</option>
+                </select>
+              </label>
+            </div>
+            <div class="inline-actions">
+              <button id="btnGenerarPdfSeleccionado" type="button" onclick="generarPdfSeleccionadoAdminUi()">Generar PDF</button>
+            </div>
+            <div id="pdfSeleccionadoResultado" class="message hidden" aria-live="polite"></div>
+          </section>
+
           <form class="panel admin-form" onsubmit="crearDocumentoUi(event)">
-            <h2>Nuevo documento</h2>
+            <h2>Registrar otro documento</h2>
+            <p class="muted">Us&aacute; este formulario para publicar un archivo que ya tenga una URL, por ejemplo un certificado o informe externo.</p>
             <div class="form-grid">
               <label>Cliente
                 <select id="selectClienteDocumento" name="idPortalCliente" onchange="actualizarSelectPublicacionesPorCliente('selectClienteDocumento', 'selectPublicacionDocumento', true)" required>
@@ -509,7 +549,14 @@
                 <input name="titulo" required>
               </label>
               <label>Tipo
-                <input name="tipo">
+                <select name="tipo">
+                  <option value="">Seleccion&aacute; un tipo</option>
+                  <option value="PDF">PDF</option>
+                  <option value="Certificado">Certificado</option>
+                  <option value="Informe">Informe</option>
+                  <option value="Hoja de seguridad">Hoja de seguridad</option>
+                  <option value="Protocolo">Protocolo</option>
+                </select>
               </label>
               <label>URL
                 <input name="url" required>

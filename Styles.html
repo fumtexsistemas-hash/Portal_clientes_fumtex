@@ -298,6 +298,45 @@
   }
 
   .admin-tabs {
+    display: grid;
+    gap: 12px;
+  }
+
+  .admin-tab-group {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #ffffff;
+  }
+
+  .admin-tab-group-secondary {
+    background: var(--bg);
+  }
+
+  .admin-tab-group-secondary > .admin-tab-actions {
+    margin-top: 8px;
+  }
+
+  .admin-tab-group-label {
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  summary.admin-tab-group-label {
+    cursor: pointer;
+    user-select: none;
+  }
+
+  summary.admin-tab-group-label:hover {
+    color: var(--brand-dark);
+  }
+
+  .admin-tab-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
@@ -318,9 +357,18 @@
     border-color: var(--brand);
   }
 
+  button:disabled {
+    cursor: wait;
+    opacity: 0.65;
+  }
+
   .admin-tab-panel {
     display: grid;
     gap: 18px;
+  }
+
+  .admin-search-label {
+    min-width: min(320px, 100%);
   }
 
   .admin-form {

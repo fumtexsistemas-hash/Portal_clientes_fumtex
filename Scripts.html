@@ -17,15 +17,17 @@
   window.portalVisitaRapidaPuntos = window.portalVisitaRapidaPuntos || 0;
   window.portalVisitaTituloManual = window.portalVisitaTituloManual || false;
   window.portalUltimaVisitaRapida = window.portalUltimaVisitaRapida || null;
+  window.portalVisitaRapidaSucia = window.portalVisitaRapidaSucia || false;
+  window.portalPdfEnProceso = window.portalPdfEnProceso || false;
   const ADMIN_TABS_CONFIG = [
     { id: 'visitaRapida', label: 'Nuevo parte de servicio' },
+    { id: 'vistaCliente', label: 'Vista cliente' },
+    { id: 'documentos', label: 'Generar PDF / Documentos' },
+    { id: 'plantillaPuntos', label: 'Plantilla de puntos' },
     { id: 'clientes', label: 'Clientes' },
     { id: 'usuarios', label: 'Usuarios' },
     { id: 'publicaciones', label: 'Carga avanzada' },
-    { id: 'plantillaPuntos', label: 'Plantilla de puntos' },
     { id: 'monitoreos', label: 'Monitoreos avanzado' },
-    { id: 'documentos', label: 'Documentos' },
-    { id: 'vistaCliente', label: 'Vista cliente' },
     { id: 'visibilidad', label: 'Gestionar visibilidad' },
     { id: 'editarRegistros', label: 'Editar registros' }
   ];
@@ -78,6 +80,26 @@
     if (!el) return;
     el.textContent = text || '';
     el.className = isError ? 'message error' : 'message';
+  }
+
+  function bloquearBotonUi_(button, texto) {
+    if (!button || button.disabled) return null;
+    const estado = { button: button, texto: button.textContent };
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    button.textContent = texto || 'Procesando...';
+    return estado;
+  }
+
+  function restaurarBotonUi_(estado) {
+    if (!estado || !estado.button) return;
+    estado.button.disabled = false;
+    estado.button.removeAttribute('aria-busy');
+    estado.button.textContent = estado.texto;
+  }
+
+  function bloquearEnvioFormularioUi_(form, texto) {
+    return bloquearBotonUi_(form ? form.querySelector('[type="submit"]') : null, texto);
   }
 
   function loginClienteUi() {
@@ -265,6 +287,7 @@
     if (token) {
       window.portalAdminToken = token;
       mostrarPanelAdmin();
+      mostrarAdminTab(sessionStorage.getItem('portalAdminTabActiva') || 'visitaRapida');
       recargarAdminListas();
       return;
     }
@@ -301,7 +324,7 @@
         sessionStorage.setItem('portalAdminToken', res.token);
         setMessage('adminLoginMensaje', '');
         mostrarPanelAdmin();
-        mostrarAdminTab('visitaRapida');
+        mostrarAdminTab(sessionStorage.getItem('portalAdminTabActiva') || 'visitaRapida');
         recargarAdminListas();
       })
       .withFailureHandler(function(error) {
@@ -357,7 +380,35 @@
           });
         }
       }
+      button.id = 'adminTabButton-' + tab.id;
+      button.setAttribute('role', 'tab');
+      button.setAttribute('aria-controls', 'adminTab-' + tab.id);
+      const tabPanel = document.getElementById('adminTab-' + tab.id);
+      if (tabPanel) {
+        tabPanel.setAttribute('role', 'tabpanel');
+        tabPanel.setAttribute('aria-labelledby', button.id);
+      }
     });
+    nav.setAttribute('role', 'tablist');
+    if (!nav.dataset.keyboardAdminTabs) {
+      nav.dataset.keyboardAdminTabs = 'true';
+      nav.addEventListener('keydown', function(event) {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        const botones = Array.prototype.filter.call(nav.querySelectorAll('.admin-tab'), function(button) {
+          return button.offsetParent !== null;
+        });
+        if (!botones.length) return;
+        const actual = Math.max(0, botones.indexOf(document.activeElement));
+        let siguiente = actual;
+        if (event.key === 'ArrowRight') siguiente = (actual + 1) % botones.length;
+        if (event.key === 'ArrowLeft') siguiente = (actual - 1 + botones.length) % botones.length;
+        if (event.key === 'Home') siguiente = 0;
+        if (event.key === 'End') siguiente = botones.length - 1;
+        event.preventDefault();
+        botones[siguiente].focus();
+        mostrarAdminTab(botones[siguiente].dataset.adminTab);
+      });
+    }
   }
 
   function ejecutarSeguroAdmin_(fn, nombre) {
@@ -373,14 +424,25 @@
     asegurarPestanasAdminCompletas();
     Array.prototype.forEach.call(document.querySelectorAll('.admin-tab-panel'), function(panel) {
       panel.classList.add('hidden');
+      panel.setAttribute('aria-hidden', 'true');
     });
     Array.prototype.forEach.call(document.querySelectorAll('.admin-tab'), function(button) {
-      button.classList.toggle('active', button.dataset.adminTab === tab);
+      const activa = button.dataset.adminTab === tab;
+      button.classList.toggle('active', activa);
+      button.setAttribute('aria-selected', activa ? 'true' : 'false');
+      button.tabIndex = activa ? 0 : -1;
     });
 
     const target = document.getElementById('adminTab-' + tab);
+    const activeButton = document.querySelector('.admin-tab[data-admin-tab="' + tab + '"]');
+    const advancedGroup = activeButton ? activeButton.closest('.admin-tab-group-secondary') : null;
+    if (advancedGroup) advancedGroup.open = true;
     setMessage('adminMensaje', '');
-    if (target) target.classList.remove('hidden');
+    if (target) {
+      target.classList.remove('hidden');
+      target.setAttribute('aria-hidden', 'false');
+      sessionStorage.setItem('portalAdminTabActiva', tab);
+    }
     try {
       if (tab === 'visitaRapida' && !Object.keys(window.portalAdminOpciones || {}).length) {
         cargarOpcionesCargaRapidaAdmin();
@@ -585,84 +647,6 @@
     const target = document.getElementById('visitaRapidaPuntos');
     if (!target) return;
     const index = window.portalVisitaRapidaPuntos++;
-    const wrapper = document.createElement('div');
-    wrapper.className = 'item visita-punto';
-    wrapper.dataset.puntoIndex = String(index);
-    wrapper.innerHTML = '<div class="visibility-item"><div><strong>Punto monitoreado</strong><small>Completa solo los puntos relevados</small></div>' +
-      '<button type="button" class="secondary-button" onclick="quitarPuntoVisitaRapida(this)">Quitar punto</button></div>' +
-      '<div class="form-grid">' +
-      '<label>Sector<input name="sector" value="' + esc(punto && punto.sector || '') + '"></label>' +
-      '<label>Punto de control<input name="puntoControl" value="' + esc(punto && punto.puntoControl || '') + '"></label>' +
-      '<label>Tipo de punto<select id="visitaTipoPunto-' + index + '" name="tipoPunto" data-opciones-grupo="TIPO_PUNTO" data-placeholder="Selecciona tipo de punto"></select></label>' +
-      '<label>Resultado<select id="visitaResultado-' + index + '" name="resultado" data-opciones-grupo="RESULTADO_MONITOREO" data-placeholder="Selecciona resultado"></select></label>' +
-      '<label>Accion correctiva<select id="visitaAccion-' + index + '" name="accionCorrectiva" data-opciones-grupo="ACCION_CORRECTIVA" data-placeholder="Selecciona accion"></select></label>' +
-      '</div><label>Novedad<textarea name="novedad">' + esc(punto && punto.novedad || '') +
-      '</textarea></label><label>Observaciones<textarea name="observaciones">' + esc(punto && punto.observaciones || '') + '</textarea></label>';
-    target.appendChild(wrapper);
-    llenarOpcionesVisitaRapida();
-  }
-
-  function quitarPuntoVisitaRapida(button) {
-    const item = button ? button.closest('.visita-punto') : null;
-    if (item) item.remove();
-  }
-
-  function limpiarVisitaRapida() {
-    const form = document.getElementById('formVisitaRapida');
-    if (form) form.reset();
-    const target = document.getElementById('visitaRapidaPuntos');
-    if (target) target.innerHTML = '';
-    window.portalVisitaRapidaPuntos = 0;
-    agregarPuntoVisitaRapida();
-    llenarOpcionesVisitaRapida();
-    setMessage('adminMensaje', '');
-  }
-
-  function crearVisitaRapidaUi(event) {
-    event.preventDefault();
-    const form = event.target;
-    const token = obtenerAdminToken();
-    if (!token) {
-      setMessage('adminMensaje', 'Primero ingresa con PIN admin.', true);
-      mostrarLoginAdmin();
-      return;
-    }
-
-    const data = formToObject(form);
-    prepararTextoInformeVisitaRapida(data);
-    data.monitoreos = obtenerPuntosVisitaRapida();
-    setMessage('adminMensaje', 'Guardando visita completa...');
-    google.script.run
-      .withSuccessHandler(function(res) {
-        if (!res || !res.ok) {
-          setMessage('adminMensaje', res && res.mensaje ? res.mensaje : 'No se pudo guardar la visita.', true);
-          return;
-        }
-        setMessage('adminMensaje', 'Visita cargada correctamente. Publicacion: ' + res.idPublicacion + '. Puntos cargados: ' + res.cantidadMonitoreos + '.');
-        limpiarVisitaRapida();
-        recargarAdminListas();
-      })
-      .withFailureHandler(function(error) {
-        setMessage('adminMensaje', error.message || String(error), true);
-      })
-      .crearVisitaRapidaAdmin(data, token);
-  }
-
-  function obtenerPuntosVisitaRapida() {
-    return Array.prototype.map.call(document.querySelectorAll('#visitaRapidaPuntos .visita-punto'), function(item) {
-      const punto = {};
-      Array.prototype.forEach.call(item.querySelectorAll('input, textarea, select'), function(el) {
-        if (!el.name) return;
-        punto[el.name] = el.value;
-      });
-      return punto;
-    });
-  }
-
-  function agregarPuntoVisitaRapida(punto) {
-    const target = document.getElementById('visitaRapidaPuntos');
-    if (!target) return;
-    const index = window.portalVisitaRapidaPuntos++;
     const numero = target.querySelectorAll('.visita-punto').length + 1;
     const wrapper = document.createElement('div');
     wrapper.className = 'item visita-punto service-point-card';
@@ -694,7 +678,13 @@
     actualizarPreviewVisitaRapida();
   }
 
-  function limpiarVisitaRapida() {
+  function marcarVisitaRapidaSucia() {
+    window.portalVisitaRapidaSucia = true;
+    actualizarPreviewVisitaRapida();
+  }
+
+  function limpiarVisitaRapida(forzar) {
+    if (!forzar && window.portalVisitaRapidaSucia && !confirm('Hay datos cargados que todavia no se guardaron. ¿Limpiar el formulario?')) return;
     const form = document.getElementById('formVisitaRapida');
     if (form) form.reset();
     const target = document.getElementById('visitaRapidaPuntos');
@@ -702,6 +692,7 @@
     window.portalVisitaRapidaPuntos = 0;
     window.portalVisitaTituloManual = false;
     window.portalUltimaVisitaRapida = null;
+    window.portalVisitaRapidaSucia = false;
     agregarPuntoVisitaRapida();
     llenarOpcionesVisitaRapida();
     limpiarOpcionesTextoServicio();
@@ -794,6 +785,7 @@
   function crearVisitaRapidaUi(event) {
     event.preventDefault();
     const form = event.target;
+    if (!form.reportValidity()) return;
     const token = obtenerAdminToken();
     if (!token) {
       setMessage('adminMensaje', 'Primero ingresa con PIN admin.', true);
@@ -804,24 +796,42 @@
     const data = formToObject(form);
     prepararTextoInformeVisitaRapida(data);
     data.monitoreos = data.incluyePuntos === 'NO' ? [] : obtenerPuntosVisitaRapida();
+    if (data.incluyePuntos !== 'NO') {
+      const puntosIncompletos = data.monitoreos.filter(function(punto) {
+        const tieneDatos = Object.keys(punto).some(function(key) { return String(punto[key] || '').trim(); });
+        return !tieneDatos || !String(punto.sector || '').trim() || !String(punto.puntoControl || '').trim();
+      });
+      if (puntosIncompletos.length) {
+        setMessage('adminMensaje', 'Completa Sector y Punto de control en cada punto, o indica que la visita no incluye monitoreo.', true);
+        const primerPunto = document.querySelector('#visitaRapidaPuntos .visita-punto input[name="sector"]');
+        if (primerPunto) primerPunto.focus();
+        return;
+      }
+    }
+    const estadoBoton = bloquearEnvioFormularioUi_(form, 'Guardando parte...');
+    if (!estadoBoton) return;
     setMessage('adminMensaje', 'Guardando parte de servicio...');
     google.script.run
       .withSuccessHandler(function(res) {
         if (!res || !res.ok) {
           setMessage('adminMensaje', res && res.mensaje ? res.mensaje : 'No se pudo guardar el parte.', true);
+          restaurarBotonUi_(estadoBoton);
           return;
         }
         window.portalUltimaVisitaRapida = {
           idPublicacion: res.idPublicacion,
           idPortalCliente: data.idPortalCliente
         };
+        window.portalVisitaRapidaSucia = false;
         setMessage('adminMensaje', 'Parte guardado correctamente. Publicacion: ' + res.idPublicacion + '. Puntos cargados: ' + res.cantidadMonitoreos + '.');
         const postSave = document.getElementById('visitaRapidaPostSave');
         if (postSave) postSave.classList.remove('hidden');
+        restaurarBotonUi_(estadoBoton);
         recargarAdminListas();
       })
       .withFailureHandler(function(error) {
         setMessage('adminMensaje', error.message || String(error), true);
+        restaurarBotonUi_(estadoBoton);
       })
       .crearVisitaRapidaAdmin(data, token);
   }
@@ -1082,7 +1092,10 @@
         }
         const clientes = res.clientes || [];
         window.portalAdminClientes = clientes;
+        window.portalAdminClientesActivos = clientes.filter(function(cliente) { return String(cliente.activo || '').toUpperCase() === 'SI'; }).length;
         target.innerHTML = clientes.length ? clientes.map(renderClienteAdmin).join('') : '<p class="muted">Sin clientes cargados.</p>';
+        actualizarContadorClientesAdmin_(clientes.length, clientes.length);
+        filtrarClientesAdmin();
         actualizarSelectsClientesAdmin();
       })
       .withFailureHandler(function(error) {
@@ -1113,9 +1126,30 @@
   }
 
   function renderClienteAdmin(item) {
-    return '<article class="item"><strong>' + esc(item.idPortalCliente || 'Sin ID') + '</strong><small>' +
+    const textoBusqueda = [item.idPortalCliente, item.razonSocial, item.nombreFantasia, item.cuit, item.emailPrincipal].join(' ').toLowerCase();
+    return '<article class="item" data-admin-cliente data-busqueda="' + esc(textoBusqueda) + '"><strong>' + esc(item.idPortalCliente || 'Sin ID') + '</strong><small>' +
       esc(item.razonSocial || item.nombreFantasia || '') + '</small><p>' + esc(item.cuit || '') +
       ' - ' + esc(item.emailPrincipal || '') + '</p><small>Activo: ' + esc(item.activo || '') + '</small></article>';
+  }
+
+  function filtrarClientesAdmin() {
+    const input = document.getElementById('adminClientesBuscar');
+    const items = document.querySelectorAll('[data-admin-cliente]');
+    const termino = String(input && input.value || '').trim().toLowerCase();
+    let visibles = 0;
+    Array.prototype.forEach.call(items, function(item) {
+      const mostrar = !termino || String(item.dataset.busqueda || '').indexOf(termino) !== -1;
+      item.classList.toggle('hidden', !mostrar);
+      if (mostrar) visibles++;
+    });
+    actualizarContadorClientesAdmin_(visibles, items.length);
+  }
+
+  function actualizarContadorClientesAdmin_(visibles, total) {
+    const contador = document.getElementById('adminClientesContador');
+    if (!contador) return;
+    const activos = Number(window.portalAdminClientesActivos || 0);
+    contador.textContent = (visibles === total ? total + ' cliente(s)' : visibles + ' de ' + total + ' cliente(s)') + ' · ' + activos + ' activo(s)';
   }
 
   function renderPublicacionAdmin(item) {
@@ -1126,7 +1160,8 @@
 
   function actualizarSelectsClientesAdmin() {
     const clientes = window.portalAdminClientes || [];
-    const ids = ['selectClienteUsuario', 'selectClientePublicacion', 'selectClienteMonitoreo', 'selectClienteDocumento', 'selectClienteVista', 'selectClienteVisibilidad', 'selectClienteEdicion', 'selectClienteVisitaRapida', 'selectClientePlantillaPuntos'];
+    const ultimoCliente = sessionStorage.getItem('portalAdminUltimoCliente') || '';
+    const ids = ['selectClienteUsuario', 'selectClientePublicacion', 'selectClienteMonitoreo', 'selectClienteDocumento', 'selectClientePdf', 'selectClienteVista', 'selectClienteVisibilidad', 'selectClienteEdicion', 'selectClienteVisitaRapida', 'selectClientePlantillaPuntos'];
     ids.forEach(function(id) {
       const select = document.getElementById(id);
       if (!select) return;
@@ -1147,6 +1182,23 @@
 
       if (valorActual && clientes.some(function(cliente) { return cliente.idPortalCliente === valorActual; })) {
         select.value = valorActual;
+      } else if (ultimoCliente && clientes.some(function(cliente) { return cliente.idPortalCliente === ultimoCliente; })) {
+        select.value = ultimoCliente;
+      }
+
+      if (!select.dataset.recuerdaClienteAdmin) {
+        select.dataset.recuerdaClienteAdmin = 'true';
+        select.addEventListener('change', function() {
+          if (!select.value) return;
+          sessionStorage.setItem('portalAdminUltimoCliente', select.value);
+          ids.forEach(function(otroId) {
+            const otroSelect = document.getElementById(otroId);
+            if (otroSelect && otroSelect !== select && Array.prototype.some.call(otroSelect.options, function(option) { return option.value === select.value; })) {
+              otroSelect.value = select.value;
+            }
+          });
+          actualizarSelectsPublicacionesDependientes();
+        });
       }
     });
 
@@ -1263,23 +1315,49 @@
       return;
     }
 
+    if (window.portalPdfEnProceso) {
+      setMessage('adminMensaje', 'Ya se esta generando un PDF. Espera a que termine.', true);
+      return;
+    }
+
     if (!confirm('Se generara un PDF del parte de servicio y se publicara en el portal del cliente. Continuar?')) return;
 
+    window.portalPdfEnProceso = true;
+    const estadoBoton = bloquearBotonUi_(document.getElementById('btnGenerarPdfSeleccionado'), 'Generando PDF...');
     setMessage('adminMensaje', 'Generando PDF...');
     google.script.run
       .withSuccessHandler(function(res) {
         if (!res || !res.ok) {
           setMessage('adminMensaje', res && res.mensaje ? res.mensaje : 'No se pudo generar el PDF.', true);
+          window.portalPdfEnProceso = false;
+          restaurarBotonUi_(estadoBoton);
           return;
         }
 
         mostrarMensajePdfGeneradoAdmin_(res);
-        cargarVistaClienteAdmin();
+        window.portalPdfEnProceso = false;
+        restaurarBotonUi_(estadoBoton);
+        const vistaCliente = document.getElementById('adminTab-vistaCliente');
+        if (vistaCliente && !vistaCliente.classList.contains('hidden')) {
+          cargarVistaClienteAdmin();
+        }
       })
       .withFailureHandler(function(error) {
         setMessage('adminMensaje', error.message || String(error), true);
+        window.portalPdfEnProceso = false;
+        restaurarBotonUi_(estadoBoton);
       })
       .generarPdfParteServicioAdmin(id, token);
+  }
+
+  function generarPdfSeleccionadoAdminUi() {
+    const select = document.getElementById('selectPublicacionPdf');
+    const idPublicacion = select ? String(select.value || '').trim() : '';
+    if (!idPublicacion) {
+      setMessage('adminMensaje', 'Selecciona un parte de servicio para generar el PDF.', true);
+      return;
+    }
+    generarPdfParteServicioAdminUi(idPublicacion);
   }
 
   function mostrarMensajePdfGeneradoAdmin_(res) {
@@ -1287,7 +1365,13 @@
     if (!el) return;
     el.className = 'message';
     const url = res && res.url ? esc(res.url) : '';
-    el.innerHTML = 'PDF generado correctamente. El cliente ya puede abrirlo desde su portal.' + (url ? ' <a href="' + url + '" target="_blank" rel="noopener">Abrir PDF</a>' : '');
+    const contenido = 'PDF generado correctamente. El cliente ya puede abrirlo desde su portal.' + (url ? ' <a href="' + url + '" target="_blank" rel="noopener">Abrir PDF</a>' : '');
+    el.innerHTML = contenido;
+    const resultado = document.getElementById('pdfSeleccionadoResultado');
+    if (resultado) {
+      resultado.className = 'message';
+      resultado.innerHTML = contenido;
+    }
   }
 
   function limpiarGestionVisibilidadAdmin() {
@@ -1594,6 +1678,7 @@
   function actualizarSelectsPublicacionesDependientes() {
     actualizarSelectPublicacionesPorCliente('selectClienteMonitoreo', 'selectPublicacionMonitoreo', false);
     actualizarSelectPublicacionesPorCliente('selectClienteDocumento', 'selectPublicacionDocumento', true);
+    actualizarSelectPublicacionesPorCliente('selectClientePdf', 'selectPublicacionPdf', false);
   }
 
   function actualizarSelectPublicacionesPorCliente(clienteSelectId, publicacionSelectId, permiteVacio) {
@@ -1696,6 +1781,7 @@
   function enviarAdminForm(event, fn, okMessage) {
     event.preventDefault();
     const form = event.target;
+    if (!form.reportValidity()) return;
     const token = obtenerAdminToken();
     if (!token) {
       setMessage('adminMensaje', 'Primero ingresa con PIN admin.', true);
@@ -1703,19 +1789,24 @@
       return;
     }
 
+    const estadoBoton = bloquearEnvioFormularioUi_(form, 'Guardando...');
+    if (!estadoBoton) return;
     setMessage('adminMensaje', 'Guardando...');
     google.script.run
       .withSuccessHandler(function(res) {
         if (!res || !res.ok) {
           setMessage('adminMensaje', res && res.mensaje ? res.mensaje : 'No se pudo guardar.', true);
+          restaurarBotonUi_(estadoBoton);
           return;
         }
         form.reset();
         setMessage('adminMensaje', okMessage + ' ID: ' + res.id);
+        restaurarBotonUi_(estadoBoton);
         recargarAdminListas();
       })
       .withFailureHandler(function(error) {
         setMessage('adminMensaje', error.message || String(error), true);
+        restaurarBotonUi_(estadoBoton);
       })[fn](formToObject(form), token);
   }
 
