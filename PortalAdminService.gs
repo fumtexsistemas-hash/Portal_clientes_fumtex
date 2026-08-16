@@ -104,7 +104,7 @@ function crearPublicacionAdmin(data, adminToken) {
     ID_PUBLICACION: normalizarTexto_(data.idPublicacion) || generarId_('PUB'),
     ID_PORTAL_CLIENTE: normalizarTexto_(cliente.ID_PORTAL_CLIENTE),
     ID_VISITA_ORIGEN: normalizarTexto_(data.idVisitaOrigen),
-    FECHA_VISITA: data.fechaVisita ? new Date(data.fechaVisita) : '',
+    FECHA_VISITA: convertirFechaAdmin_(data.fechaVisita, 'fecha de visita', true),
     SUCURSAL: normalizarTexto_(data.sucursal),
     TIPO_SERVICIO: normalizarTexto_(data.tipoServicio),
     TITULO: normalizarTexto_(data.titulo),
@@ -113,8 +113,8 @@ function crearPublicacionAdmin(data, adminToken) {
     RESUMEN_CLIENTE: normalizarTexto_(data.resumenCliente),
     CONTENIDO: normalizarTexto_(data.contenido),
     VISIBLE: normalizarSiNo_(data.visible),
-    FECHA_CARGA: data.fechaCarga ? new Date(data.fechaCarga) : new Date(),
-    FECHA_PUBLICACION: data.fechaPublicacion ? new Date(data.fechaPublicacion) : new Date(),
+    FECHA_CARGA: data.fechaCarga ? convertirFechaAdmin_(data.fechaCarga, 'fecha de carga') : new Date(),
+    FECHA_PUBLICACION: data.fechaPublicacion ? convertirFechaAdmin_(data.fechaPublicacion, 'fecha de publicacion') : new Date(),
     USUARIO_CARGA: usuario
   };
 
@@ -133,7 +133,7 @@ function crearMonitoreoAdmin(data, adminToken) {
     ID_MONITOREO: normalizarTexto_(data.idMonitoreo) || generarId_('MON'),
     ID_PUBLICACION: idPublicacion,
     ID_PORTAL_CLIENTE: idPortalCliente,
-    FECHA: data.fecha ? new Date(data.fecha) : new Date(),
+    FECHA: convertirFechaAdmin_(data.fecha, 'fecha del monitoreo'),
     SECTOR: normalizarTexto_(data.sector),
     PUNTO_CONTROL: normalizarTexto_(data.puntoControl),
     TIPO: normalizarTexto_(data.tipo),
@@ -188,8 +188,7 @@ function crearVisitaRapidaAdmin(data, adminToken) {
   const idPublicacion = generarId_('PUB');
   const contenido = normalizarTexto_(data.contenido) || construirContenidoVisitaRapida_(data);
   const titulo = normalizarTexto_(data.titulo) || ('Servicio ' + normalizarTexto_(data.servicio));
-  const fechaVisita = new Date(data.fechaVisita);
-  if (isNaN(fechaVisita.getTime())) throw new Error('La fecha de visita no es valida.');
+  const fechaVisita = convertirFechaAdmin_(data.fechaVisita, 'fecha de visita');
 
   const publicacion = {
     ID_PUBLICACION: idPublicacion,
@@ -1213,6 +1212,36 @@ function validarDataAdmin_(data, campos) {
   });
 }
 
+function convertirFechaAdmin_(valor, etiqueta, permitirVacia) {
+  if (valor === '' || valor === null || valor === undefined) {
+    if (permitirVacia) return '';
+    throw new Error('Falta completar la ' + (etiqueta || 'fecha') + '.');
+  }
+
+  if (Object.prototype.toString.call(valor) === '[object Date]') {
+    if (isNaN(valor.getTime())) throw new Error('La ' + (etiqueta || 'fecha') + ' no es valida.');
+    return valor;
+  }
+
+  const texto = normalizarTexto_(valor);
+  const fechaSimple = /^(\d{4})-(\d{2})-(\d{2})$/.exec(texto);
+  let fecha;
+  if (fechaSimple) {
+    const anio = Number(fechaSimple[1]);
+    const mes = Number(fechaSimple[2]);
+    const dia = Number(fechaSimple[3]);
+    fecha = new Date(anio, mes - 1, dia, 12, 0, 0);
+    if (fecha.getFullYear() !== anio || fecha.getMonth() !== mes - 1 || fecha.getDate() !== dia) {
+      throw new Error('La ' + (etiqueta || 'fecha') + ' no es valida.');
+    }
+    return fecha;
+  }
+
+  fecha = new Date(texto);
+  if (isNaN(fecha.getTime())) throw new Error('La ' + (etiqueta || 'fecha') + ' no es valida.');
+  return fecha;
+}
+
 function obtenerClientePortalActivoPorId_(idPortalCliente) {
   const id = normalizarTexto_(idPortalCliente);
   if (!id) throw new Error('Falta ID_PORTAL_CLIENTE.');
@@ -1377,7 +1406,7 @@ function actualizarRegistroPortalPorId_(nombreHoja, idHeader, idRegistro, data, 
         throw new Error(header + ' debe ser SI o NO.');
       }
     } else if (header === 'FECHA_VISITA') {
-      valor = valor ? new Date(valor) : '';
+      valor = convertirFechaAdmin_(valor, 'fecha de visita', true);
     } else if (header === 'URL') {
       valor = validarUrlDocumentoAdmin_(valor);
     } else {
