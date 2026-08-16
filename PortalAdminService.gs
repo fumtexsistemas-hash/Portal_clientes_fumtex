@@ -127,10 +127,12 @@ function crearMonitoreoAdmin(data, adminToken) {
   const usuario = validarAdminToken_(adminToken);
   validarDataAdmin_(data, ['idPortalCliente', 'fecha', 'resultado']);
   const cliente = obtenerClientePortalActivoPorId_(data.idPortalCliente);
+  const idPortalCliente = normalizarTexto_(cliente.ID_PORTAL_CLIENTE);
+  const idPublicacion = validarPublicacionPerteneceClienteAdmin_(data.idPublicacion, idPortalCliente);
   const row = {
     ID_MONITOREO: normalizarTexto_(data.idMonitoreo) || generarId_('MON'),
-    ID_PUBLICACION: normalizarTexto_(data.idPublicacion),
-    ID_PORTAL_CLIENTE: normalizarTexto_(cliente.ID_PORTAL_CLIENTE),
+    ID_PUBLICACION: idPublicacion,
+    ID_PORTAL_CLIENTE: idPortalCliente,
     FECHA: data.fecha ? new Date(data.fecha) : new Date(),
     SECTOR: normalizarTexto_(data.sector),
     PUNTO_CONTROL: normalizarTexto_(data.puntoControl),
@@ -153,11 +155,13 @@ function crearDocumentoAdmin(data, adminToken) {
   const usuario = validarAdminToken_(adminToken);
   validarDataAdmin_(data, ['idPortalCliente', 'titulo', 'url']);
   const cliente = obtenerClientePortalActivoPorId_(data.idPortalCliente);
+  const idPortalCliente = normalizarTexto_(cliente.ID_PORTAL_CLIENTE);
+  const idPublicacion = validarPublicacionPerteneceClienteAdmin_(data.idPublicacion, idPortalCliente);
   const urlDocumento = validarUrlDocumentoAdmin_(data.url);
   const row = {
     ID_DOCUMENTO: normalizarTexto_(data.idDocumento) || generarId_('DOC'),
-    ID_PORTAL_CLIENTE: normalizarTexto_(cliente.ID_PORTAL_CLIENTE),
-    ID_PUBLICACION: normalizarTexto_(data.idPublicacion),
+    ID_PORTAL_CLIENTE: idPortalCliente,
+    ID_PUBLICACION: idPublicacion,
     TITULO: normalizarTexto_(data.titulo),
     TIPO: normalizarTexto_(data.tipo),
     URL: urlDocumento,
@@ -779,7 +783,7 @@ function actualizarDocumentoAdmin(idDocumento, data, adminToken) {
 function validarUrlDocumentoAdmin_(valor) {
   const url = normalizarTexto_(valor);
   if (!url) throw new Error('Falta la URL del documento.');
-  if (!/^https:\/\/[^\s]+$/i.test(url)) {
+  if (!/^https:\/\/[^\s<>"']+$/i.test(url)) {
     throw new Error('La URL del documento debe ser un enlace seguro que comience con https://.');
   }
   return url;
@@ -1239,6 +1243,22 @@ function obtenerClientePortalPorIdAdmin_(idPortalCliente) {
   return clientes.find(function(row) {
     return normalizarTexto_(row.ID_PORTAL_CLIENTE) === id;
   }) || null;
+}
+
+function validarPublicacionPerteneceClienteAdmin_(idPublicacion, idPortalCliente) {
+  const id = normalizarTexto_(idPublicacion);
+  if (!id) return '';
+
+  const idCliente = normalizarTexto_(idPortalCliente);
+  const publicacion = leerFilasPorHeaders_(obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.PUBLICACIONES)).find(function(row) {
+    return normalizarTexto_(row.ID_PUBLICACION) === id;
+  });
+
+  if (!publicacion) throw new Error('No existe la publicacion seleccionada: ' + id);
+  if (normalizarTexto_(publicacion.ID_PORTAL_CLIENTE) !== idCliente) {
+    throw new Error('La publicacion seleccionada no pertenece al cliente indicado.');
+  }
+  return id;
 }
 
 function leerRegistrosGestionPortal_(nombreHoja, idPortalCliente, mapper) {
