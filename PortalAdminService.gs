@@ -67,7 +67,7 @@ function crearClientePortalAdmin(data, adminToken) {
     OBSERVACIONES: normalizarTexto_(data.observaciones)
   };
 
-  appendPortalRow_(PORTAL_CONFIG.HOJAS.CLIENTES, row);
+  appendPortalRowConIdUnico_(PORTAL_CONFIG.HOJAS.CLIENTES, 'ID_PORTAL_CLIENTE', row);
   registrarLog('', row.ID_PORTAL_CLIENTE, 'CREAR_CLIENTE_PORTAL', 'OK', usuario + ' - ' + row.ID_PORTAL_CLIENTE);
   return { ok: true, id: row.ID_PORTAL_CLIENTE, mensaje: 'Cliente portal creado.' };
 }
@@ -91,7 +91,7 @@ function crearUsuarioPortalAdmin(data, adminToken) {
     ULTIMO_ACCESO: ''
   };
 
-  appendPortalRow_(PORTAL_CONFIG.HOJAS.USUARIOS, row);
+  appendPortalRowConIdUnico_(PORTAL_CONFIG.HOJAS.USUARIOS, 'ID_USUARIO', row);
   registrarLog('', row.ID_PORTAL_CLIENTE, 'CREAR_USUARIO_PORTAL', 'OK', usuario + ' - ' + row.ID_USUARIO);
   return { ok: true, id: row.ID_USUARIO, mensaje: 'Usuario portal creado.' };
 }
@@ -118,7 +118,7 @@ function crearPublicacionAdmin(data, adminToken) {
     USUARIO_CARGA: usuario
   };
 
-  appendPortalRow_(PORTAL_CONFIG.HOJAS.PUBLICACIONES, row);
+  appendPortalRowConIdUnico_(PORTAL_CONFIG.HOJAS.PUBLICACIONES, 'ID_PUBLICACION', row);
   registrarLog('', row.ID_PORTAL_CLIENTE, 'CREAR_PUBLICACION', 'OK', usuario + ' - ' + row.ID_PUBLICACION);
   return { ok: true, id: row.ID_PUBLICACION, mensaje: 'Publicacion creada.' };
 }
@@ -146,7 +146,7 @@ function crearMonitoreoAdmin(data, adminToken) {
     USUARIO_CARGA: usuario
   };
 
-  appendPortalRow_(PORTAL_CONFIG.HOJAS.MONITOREOS, row);
+  appendPortalRowConIdUnico_(PORTAL_CONFIG.HOJAS.MONITOREOS, 'ID_MONITOREO', row);
   registrarLog('', row.ID_PORTAL_CLIENTE, 'CREAR_MONITOREO', 'OK', usuario + ' - ' + row.ID_MONITOREO);
   return { ok: true, id: row.ID_MONITOREO, mensaje: 'Monitoreo creado.' };
 }
@@ -172,7 +172,7 @@ function crearDocumentoAdmin(data, adminToken) {
     USUARIO_CARGA: usuario
   };
 
-  appendPortalRow_(PORTAL_CONFIG.HOJAS.DOCUMENTOS, row);
+  appendPortalRowConIdUnico_(PORTAL_CONFIG.HOJAS.DOCUMENTOS, 'ID_DOCUMENTO', row);
   registrarLog('', row.ID_PORTAL_CLIENTE, 'CREAR_DOCUMENTO', 'OK', usuario + ' - ' + row.ID_DOCUMENTO);
   return { ok: true, id: row.ID_DOCUMENTO, mensaje: 'Documento creado.' };
 }
@@ -372,7 +372,7 @@ function crearPuntoClienteAdmin(data, adminToken) {
     USUARIO_CARGA: usuario
   };
 
-  appendPortalRow_(PORTAL_CONFIG.HOJAS.PUNTOS_CLIENTE, row);
+  appendPortalRowConIdUnico_(PORTAL_CONFIG.HOJAS.PUNTOS_CLIENTE, 'ID_PUNTO_CLIENTE', row);
   registrarLog('', idPortalCliente, 'CREAR_PUNTO_CLIENTE', 'OK', usuario + ' - ' + row.ID_PUNTO_CLIENTE);
   return {
     ok: true,

@@ -51,6 +51,33 @@ function appendPortalRow_(nombreHoja, data) {
   return appendPortalRows_(nombreHoja, [data]);
 }
 
+function appendPortalRowConIdUnico_(nombreHoja, idHeader, data) {
+  validarNombreHojaPortal_(nombreHoja);
+  const headerId = normalizarTexto_(idHeader);
+  const id = normalizarTexto_(data && data[headerId]);
+  if (!headerId || !id) throw new Error('Falta el identificador requerido para guardar el registro.');
+
+  return ejecutarConBloqueoPortal_(function() {
+    const hoja = obtenerHojaPortal_(nombreHoja);
+    const headers = hoja.getRange(1, 1, 1, hoja.getLastColumn()).getValues()[0].map(function(header) {
+      return normalizarTexto_(header);
+    });
+    const idCol = headers.indexOf(headerId) + 1;
+    if (!idCol) throw new Error('No existe la columna ' + headerId + ' en ' + nombreHoja + '.');
+
+    if (hoja.getLastRow() >= 2) {
+      const coincidencia = hoja
+        .getRange(2, idCol, hoja.getLastRow() - 1, 1)
+        .createTextFinder(id)
+        .matchEntireCell(true)
+        .findNext();
+      if (coincidencia) throw new Error('Ya existe un registro con ' + headerId + ': ' + id);
+    }
+
+    return appendPortalRowsEnHojaSinLock_(hoja, [data]);
+  });
+}
+
 function appendPortalRows_(nombreHoja, filas) {
   validarNombreHojaPortal_(nombreHoja);
   const datos = Array.isArray(filas) ? filas.filter(Boolean) : [];
