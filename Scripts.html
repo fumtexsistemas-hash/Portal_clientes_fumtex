@@ -2535,9 +2535,19 @@ function ocultarBloqueClienteClasicoUi_(id) {
   window.adminMobilePasoActual = window.adminMobilePasoActual || 1;
   window.adminMobilePuntos = window.adminMobilePuntos || [];
   window.adminMobileUltimaPublicacion = window.adminMobileUltimaPublicacion || null;
+  window.adminMobileParteSucia = window.adminMobileParteSucia || false;
+  window.adminMobilePdfEnProceso = window.adminMobilePdfEnProceso || false;
 
   function inicializarAdminMobile() {
     console.log('inicializarAdminMobile');
+    if (!window.adminMobileBeforeUnloadConfigurado) {
+      window.adminMobileBeforeUnloadConfigurado = true;
+      window.addEventListener('beforeunload', function(event) {
+        if (!window.adminMobileParteSucia) return;
+        event.preventDefault();
+        event.returnValue = '';
+      });
+    }
     limpiarSesionAdminMobileInicial_();
     mostrarLoginAdminMobile();
     setMessage('adminMobileLoginMensaje', 'Ingresa el PIN admin para continuar.');
@@ -2563,7 +2573,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
     const panel = document.getElementById('adminMobilePanel');
     if (login) login.classList.add('hidden');
     if (panel) panel.classList.remove('hidden');
-    mostrarSeccionAdminMobile('parte');
+    mostrarSeccionAdminMobile(sessionStorage.getItem('adminMobileSeccionActiva') || 'parte');
     mostrarPasoParteMobile(1);
   }
 
@@ -2608,12 +2618,22 @@ function ocultarBloqueClienteClasicoUi_(id) {
   function mostrarSeccionAdminMobile(seccion) {
     Array.prototype.forEach.call(document.querySelectorAll('.mobile-section'), function(panel) {
       panel.classList.add('hidden');
+      panel.setAttribute('aria-hidden', 'true');
     });
     Array.prototype.forEach.call(document.querySelectorAll('[data-mobile-section]'), function(button) {
-      button.classList.toggle('active', button.dataset.mobileSection === seccion);
+      const activa = button.dataset.mobileSection === seccion;
+      button.classList.toggle('active', activa);
+      button.setAttribute('aria-current', activa ? 'page' : 'false');
     });
     const target = document.getElementById('adminMobileSection-' + seccion);
-    if (target) target.classList.remove('hidden');
+    if (target) {
+      target.classList.remove('hidden');
+      target.setAttribute('aria-hidden', 'false');
+      sessionStorage.setItem('adminMobileSeccionActiva', seccion);
+    }
+    const activeButton = document.querySelector('[data-mobile-section="' + seccion + '"]');
+    const advanced = activeButton ? activeButton.closest('.mobile-advanced-actions') : null;
+    if (advanced) advanced.open = true;
     setMessage('adminMobileMensaje', '');
     if (seccion === 'parte') mostrarPasoParteMobile(window.adminMobilePasoActual || 1);
     if (seccion === 'pdf') actualizarPublicacionesPdfMobile();
@@ -2678,6 +2698,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
       'mobileSelectClienteUsuario',
       'mobileSelectClienteDocumento'
     ];
+    const ultimoCliente = sessionStorage.getItem('adminMobileUltimoCliente') || '';
     ids.forEach(function(id) {
       const select = document.getElementById(id);
       if (!select) return;
@@ -2688,6 +2709,22 @@ function ocultarBloqueClienteClasicoUi_(id) {
         select.appendChild(crearOption(cliente.idPortalCliente, textoClienteAdmin(cliente)));
       });
       if (actual) select.value = actual;
+      else if (ultimoCliente) select.value = ultimoCliente;
+      if (!select.dataset.recuerdaClienteMobile) {
+        select.dataset.recuerdaClienteMobile = 'true';
+        select.addEventListener('change', function() {
+          if (!select.value) return;
+          sessionStorage.setItem('adminMobileUltimoCliente', select.value);
+          ids.forEach(function(otroId) {
+            const otro = document.getElementById(otroId);
+            if (otro && otro !== select && Array.prototype.some.call(otro.options, function(option) { return option.value === select.value; })) {
+              otro.value = select.value;
+            }
+          });
+          actualizarPublicacionesPdfMobile();
+          actualizarPublicacionesDocumentoMobile();
+        });
+      }
     });
     completarCuitUsuarioMobile();
     actualizarPublicacionesDocumentoMobile();
@@ -2734,6 +2771,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
   function mostrarPasoParteMobile(numero) {
     const total = 5;
     const paso = Math.max(1, Math.min(total, Number(numero) || 1));
+    if (paso > window.adminMobilePasoActual && !validarPasoParteMobile_(window.adminMobilePasoActual)) return;
     window.adminMobilePasoActual = paso;
     Array.prototype.forEach.call(document.querySelectorAll('[data-mobile-step]'), function(panel) {
       panel.classList.toggle('hidden', Number(panel.dataset.mobileStep) !== paso);
@@ -2749,6 +2787,34 @@ function ocultarBloqueClienteClasicoUi_(id) {
     if (save) save.classList.toggle('hidden', paso !== total);
     if (paso === total) renderResumenParteMobile();
     window.scrollTo(0, 0);
+  }
+
+  function validarPasoParteMobile_(paso) {
+    const panel = document.querySelector('[data-mobile-step="' + paso + '"]');
+    if (!panel) return true;
+    const requeridos = panel.querySelectorAll('[required]');
+    for (let i = 0; i < requeridos.length; i++) {
+      if (!requeridos[i].checkValidity()) {
+        requeridos[i].reportValidity();
+        requeridos[i].focus();
+        return false;
+      }
+    }
+    if (Number(paso) === 4) return validarPuntosParteMobile_();
+    return true;
+  }
+
+  function validarPuntosParteMobile_() {
+    const incompleto = (window.adminMobilePuntos || []).find(function(punto) {
+      return !String(punto.sector || '').trim() || !String(punto.puntoControl || '').trim();
+    });
+    if (!incompleto) return true;
+    setMessage('adminMobileMensaje', 'Completa Sector y Punto en cada punto cargado antes de continuar.', true);
+    return false;
+  }
+
+  function marcarParteMobileSucia() {
+    window.adminMobileParteSucia = true;
   }
 
   function cargarPuntosClienteMobile() {
@@ -2775,6 +2841,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
             observaciones: punto.observaciones || ''
           };
         });
+        window.adminMobileParteSucia = true;
         renderPuntosMobile();
         setMessage('adminMobileMensaje', puntos.length ? 'Puntos cargados: ' + puntos.length : 'El cliente no tiene plantilla de puntos cargada.');
       })
@@ -2795,17 +2862,20 @@ function ocultarBloqueClienteClasicoUi_(id) {
       accionCorrectiva: 'No requiere',
       observaciones: ''
     });
+    window.adminMobileParteSucia = true;
     renderPuntosMobile();
   }
 
   function quitarPuntoMobile(index) {
     window.adminMobilePuntos.splice(index, 1);
+    window.adminMobileParteSucia = true;
     renderPuntosMobile();
   }
 
   function actualizarPuntoMobile(index, campo, valor) {
     if (!window.adminMobilePuntos[index]) return;
     window.adminMobilePuntos[index][campo] = valor;
+    window.adminMobileParteSucia = true;
   }
 
   function renderPuntosMobile() {
@@ -2884,6 +2954,14 @@ function ocultarBloqueClienteClasicoUi_(id) {
       mostrarLoginAdminMobile();
       return;
     }
+    for (let paso = 1; paso <= 4; paso++) {
+      if (!validarPasoParteMobile_(paso)) {
+        mostrarPasoParteMobile(paso);
+        return;
+      }
+    }
+    const estadoBoton = bloquearEnvioFormularioUi_(form, 'Guardando parte...');
+    if (!estadoBoton) return;
     const data = formToObject(form);
     prepararTextoInformeMobile(data);
     data.monitoreos = window.adminMobilePuntos || [];
@@ -2892,29 +2970,35 @@ function ocultarBloqueClienteClasicoUi_(id) {
       .withSuccessHandler(function(res) {
         if (!res || !res.ok) {
           setMessage('adminMobileMensaje', res && res.mensaje ? res.mensaje : 'No se pudo guardar el parte.', true);
+          restaurarBotonUi_(estadoBoton);
           return;
         }
         window.adminMobileUltimaPublicacion = {
           idPublicacion: res.idPublicacion,
           idPortalCliente: data.idPortalCliente
         };
+        window.adminMobileParteSucia = false;
         const detalle = document.getElementById('mobilePostSaveDetalle');
         if (detalle) detalle.textContent = 'Publicacion: ' + res.idPublicacion + '. Puntos cargados: ' + (res.cantidadMonitoreos || 0) + '.';
         const post = document.getElementById('mobilePostSave');
         if (post) post.classList.remove('hidden');
+        restaurarBotonUi_(estadoBoton);
         setMessage('adminMobileMensaje', 'Parte guardado correctamente.');
         cargarPublicacionesAdminMobile();
       })
       .withFailureHandler(function(error) {
         setMessage('adminMobileMensaje', error.message || String(error), true);
+        restaurarBotonUi_(estadoBoton);
       })
       .crearVisitaRapidaAdmin(data, token);
   }
 
-  function cargarOtroParteMobile() {
+  function cargarOtroParteMobile(forzar) {
+    if (!forzar && window.adminMobileParteSucia && !confirm('Hay datos sin guardar. ¿Limpiar el parte?')) return;
     const form = document.getElementById('adminMobileParteForm');
     if (form) form.reset();
     window.adminMobilePuntos = [];
+    window.adminMobileParteSucia = false;
     document.querySelectorAll('[data-mobile-combo-check]').forEach(function(input) { input.checked = false; });
     document.querySelectorAll('[data-mobile-combo-free]').forEach(function(textarea) { textarea.value = ''; });
     const post = document.getElementById('mobilePostSave');
@@ -3015,12 +3099,16 @@ function ocultarBloqueClienteClasicoUi_(id) {
       mostrarLoginAdminMobile();
       return;
     }
+    if (!form.reportValidity()) return;
+    const estadoBoton = bloquearEnvioFormularioUi_(form, 'Guardando...');
+    if (!estadoBoton) return;
     const data = formToObject(form);
     setMessage('adminMobileMensaje', 'Guardando cliente...');
     google.script.run
       .withSuccessHandler(function(res) {
         if (!res || !res.ok) {
           setMessage('adminMobileMensaje', res && res.mensaje ? res.mensaje : 'No se pudo guardar el cliente.', true);
+          restaurarBotonUi_(estadoBoton);
           return;
         }
         setMessage('adminMobileMensaje', res.mensaje || 'Cliente guardado.');
@@ -3028,10 +3116,12 @@ function ocultarBloqueClienteClasicoUi_(id) {
           target.innerHTML = '<article class="mobile-result-card"><strong>Cliente creado</strong><p>ID: ' + esc(res.id || '') + '</p></article>';
         }
         if (form) form.reset();
+        restaurarBotonUi_(estadoBoton);
         cargarClientesAdminMobile();
       })
       .withFailureHandler(function(error) {
         setMessage('adminMobileMensaje', error.message || String(error), true);
+        restaurarBotonUi_(estadoBoton);
       })
       .crearClientePortalAdmin(data, token);
   }
@@ -3045,12 +3135,16 @@ function ocultarBloqueClienteClasicoUi_(id) {
       mostrarLoginAdminMobile();
       return;
     }
+    if (!form.reportValidity()) return;
+    const estadoBoton = bloquearEnvioFormularioUi_(form, 'Guardando...');
+    if (!estadoBoton) return;
     const data = formToObject(form);
     setMessage('adminMobileMensaje', 'Guardando usuario...');
     google.script.run
       .withSuccessHandler(function(res) {
         if (!res || !res.ok) {
           setMessage('adminMobileMensaje', res && res.mensaje ? res.mensaje : 'No se pudo guardar el usuario.', true);
+          restaurarBotonUi_(estadoBoton);
           return;
         }
         setMessage('adminMobileMensaje', res.mensaje || 'Usuario guardado.');
@@ -3058,10 +3152,12 @@ function ocultarBloqueClienteClasicoUi_(id) {
           target.innerHTML = '<article class="mobile-result-card"><strong>Usuario creado</strong><p>ID: ' + esc(res.id || '') + '</p></article>';
         }
         if (form) form.reset();
+        restaurarBotonUi_(estadoBoton);
         completarCuitUsuarioMobile();
       })
       .withFailureHandler(function(error) {
         setMessage('adminMobileMensaje', error.message || String(error), true);
+        restaurarBotonUi_(estadoBoton);
       })
       .crearUsuarioPortalAdmin(data, token);
   }
@@ -3075,12 +3171,16 @@ function ocultarBloqueClienteClasicoUi_(id) {
       mostrarLoginAdminMobile();
       return;
     }
+    if (!form.reportValidity()) return;
+    const estadoBoton = bloquearEnvioFormularioUi_(form, 'Guardando...');
+    if (!estadoBoton) return;
     const data = formToObject(form);
     setMessage('adminMobileMensaje', 'Guardando documento...');
     google.script.run
       .withSuccessHandler(function(res) {
         if (!res || !res.ok) {
           setMessage('adminMobileMensaje', res && res.mensaje ? res.mensaje : 'No se pudo guardar el documento.', true);
+          restaurarBotonUi_(estadoBoton);
           return;
         }
         setMessage('adminMobileMensaje', res.mensaje || 'Documento guardado.');
@@ -3088,9 +3188,11 @@ function ocultarBloqueClienteClasicoUi_(id) {
           target.innerHTML = '<article class="mobile-result-card"><strong>Documento creado</strong><p>ID: ' + esc(res.id || '') + '</p></article>';
         }
         if (form) form.reset();
+        restaurarBotonUi_(estadoBoton);
       })
       .withFailureHandler(function(error) {
         setMessage('adminMobileMensaje', error.message || String(error), true);
+        restaurarBotonUi_(estadoBoton);
       })
       .crearDocumentoAdmin(data, token);
   }
@@ -3116,21 +3218,34 @@ function ocultarBloqueClienteClasicoUi_(id) {
       setMessage('adminMobileMensaje', 'No hay una publicacion para generar PDF.', true);
       return;
     }
+    if (window.adminMobilePdfEnProceso) {
+      setMessage('adminMobileMensaje', 'Ya se esta generando un PDF. Espera a que termine.', true);
+      return;
+    }
+    if (!confirm('Se generara y publicara el PDF en el portal del cliente. ¿Continuar?')) return;
+    window.adminMobilePdfEnProceso = true;
+    const estadoBoton = bloquearBotonUi_(document.getElementById('mobileGenerarPdfButton'), 'Generando PDF...');
     setMessage('adminMobileMensaje', 'Generando PDF...');
     google.script.run
       .withSuccessHandler(function(res) {
         if (!res || !res.ok) {
           setMessage('adminMobileMensaje', res && res.mensaje ? res.mensaje : 'No se pudo generar PDF.', true);
+          window.adminMobilePdfEnProceso = false;
+          restaurarBotonUi_(estadoBoton);
           return;
         }
         setMessage('adminMobileMensaje', res.mensaje || 'PDF generado correctamente.');
         if (target) {
           target.innerHTML = '<article class="mobile-result-card"><strong>' + esc(res.nombreArchivo || 'PDF generado') + '</strong><a class="mobile-link-button" target="_blank" href="' + esc(res.url || '') + '">Abrir PDF</a></article>';
         }
+        window.adminMobilePdfEnProceso = false;
+        restaurarBotonUi_(estadoBoton);
         cargarPublicacionesAdminMobile();
       })
       .withFailureHandler(function(error) {
         setMessage('adminMobileMensaje', error.message || String(error), true);
+        window.adminMobilePdfEnProceso = false;
+        restaurarBotonUi_(estadoBoton);
       })
       .generarPdfParteServicioAdmin(id, token);
   }
