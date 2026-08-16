@@ -2586,6 +2586,10 @@ function ocultarBloqueClienteClasicoUi_(id) {
   window.adminMobileParteSucia = window.adminMobileParteSucia || false;
   window.adminMobilePdfEnProceso = window.adminMobilePdfEnProceso || false;
   window.adminMobileTituloManual = window.adminMobileTituloManual || false;
+  window.adminMobileBorradorRestaurado = window.adminMobileBorradorRestaurado || false;
+  window.adminMobileClientesCargados = false;
+  window.adminMobileOpcionesCargadas = false;
+  const ADMIN_MOBILE_BORRADOR_KEY = 'portalAdminMobileBorradorParteV1';
 
   function inicializarAdminMobile() {
     console.log('inicializarAdminMobile');
@@ -2593,6 +2597,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
       window.adminMobileBeforeUnloadConfigurado = true;
       window.addEventListener('beforeunload', function(event) {
         if (!window.adminMobileParteSucia) return;
+        guardarBorradorParteMobile_();
         event.preventDefault();
         event.returnValue = '';
       });
@@ -2695,13 +2700,17 @@ function ocultarBloqueClienteClasicoUi_(id) {
     google.script.run
       .withSuccessHandler(function(res) {
         window.portalAdminClientes = res && res.ok ? (res.clientes || []) : [];
+        window.adminMobileClientesCargados = true;
         llenarSelectsClientesMobile();
+        intentarRestaurarBorradorParteMobile_();
         if (!window.portalAdminClientes.length) {
           setMessage('adminMobileMensaje', 'No hay clientes cargados. Primero carga un cliente desde el Admin de escritorio.', true);
         }
       })
       .withFailureHandler(function(error) {
+        window.adminMobileClientesCargados = true;
         console.error('error clientes mobile', error);
+        intentarRestaurarBorradorParteMobile_();
         setMessage('adminMobileMensaje', error.message || String(error), true);
       })
       .listarClientesPortalAdmin(token);
@@ -2713,12 +2722,16 @@ function ocultarBloqueClienteClasicoUi_(id) {
     google.script.run
       .withSuccessHandler(function(res) {
         window.portalAdminOpciones = normalizarOpcionesPortalAdmin(res && res.ok ? res.opciones : {});
+        window.adminMobileOpcionesCargadas = true;
         llenarOpcionesMobile();
+        intentarRestaurarBorradorParteMobile_();
       })
       .withFailureHandler(function(error) {
         console.error('error opciones mobile', error);
         window.portalAdminOpciones = normalizarOpcionesPortalAdmin({});
+        window.adminMobileOpcionesCargadas = true;
         llenarOpcionesMobile();
+        intentarRestaurarBorradorParteMobile_();
         setMessage('adminMobileMensaje', 'No se pudieron cargar las opciones. Se usan opciones por defecto.', true);
       })
       .obtenerOpcionesPortalAdmin(token);
@@ -2871,6 +2884,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
     if (next) next.classList.toggle('hidden', paso === total);
     if (save) save.classList.toggle('hidden', paso !== total);
     if (paso === total) renderResumenParteMobile();
+    if (window.adminMobileParteSucia) programarGuardadoBorradorParteMobile_();
     window.scrollTo(0, 0);
   }
 
@@ -2902,6 +2916,90 @@ function ocultarBloqueClienteClasicoUi_(id) {
 
   function marcarParteMobileSucia() {
     window.adminMobileParteSucia = true;
+    programarGuardadoBorradorParteMobile_();
+  }
+
+  function programarGuardadoBorradorParteMobile_() {
+    if (window.adminMobileGuardadoBorradorTimer) clearTimeout(window.adminMobileGuardadoBorradorTimer);
+    window.adminMobileGuardadoBorradorTimer = setTimeout(guardarBorradorParteMobile_, 350);
+  }
+
+  function guardarBorradorParteMobile_() {
+    const form = document.getElementById('adminMobileParteForm');
+    if (!form || !window.adminMobileParteSucia) return;
+    const combos = {};
+    document.querySelectorAll('[data-mobile-combo-check]:checked').forEach(function(input) {
+      const campo = input.dataset.mobileComboCheck;
+      if (!combos[campo]) combos[campo] = [];
+      combos[campo].push(input.value);
+    });
+    const libres = {};
+    document.querySelectorAll('[data-mobile-combo-free]').forEach(function(textarea) {
+      libres[textarea.dataset.mobileComboFree] = textarea.value || '';
+    });
+    const borrador = {
+      version: 1,
+      guardadoEn: new Date().toISOString(),
+      paso: window.adminMobilePasoActual || 1,
+      campos: formToObject(form),
+      puntos: window.adminMobilePuntos || [],
+      tituloManual: Boolean(window.adminMobileTituloManual),
+      combos: combos,
+      libres: libres
+    };
+    try {
+      localStorage.setItem(ADMIN_MOBILE_BORRADOR_KEY, JSON.stringify(borrador));
+    } catch (error) {
+      console.error('No se pudo guardar el borrador mobile', error);
+    }
+  }
+
+  function intentarRestaurarBorradorParteMobile_() {
+    if (window.adminMobileBorradorRestaurado || !window.adminMobileClientesCargados || !window.adminMobileOpcionesCargadas) return;
+    let borrador;
+    try {
+      borrador = JSON.parse(localStorage.getItem(ADMIN_MOBILE_BORRADOR_KEY) || 'null');
+    } catch (error) {
+      localStorage.removeItem(ADMIN_MOBILE_BORRADOR_KEY);
+      return;
+    }
+    window.adminMobileBorradorRestaurado = true;
+    if (!borrador || borrador.version !== 1) return;
+    const antiguedad = Date.now() - new Date(borrador.guardadoEn || 0).getTime();
+    if (!isFinite(antiguedad) || antiguedad > 7 * 24 * 60 * 60 * 1000) {
+      eliminarBorradorParteMobile_();
+      return;
+    }
+
+    const form = document.getElementById('adminMobileParteForm');
+    if (!form) return;
+    Object.keys(borrador.campos || {}).forEach(function(nombre) {
+      const campo = form.elements[nombre];
+      if (!campo) return;
+      if (campo.type === 'checkbox') campo.checked = Boolean(borrador.campos[nombre]);
+      else campo.value = borrador.campos[nombre];
+    });
+    document.querySelectorAll('[data-mobile-combo-check]').forEach(function(input) {
+      const valores = (borrador.combos && borrador.combos[input.dataset.mobileComboCheck]) || [];
+      input.checked = valores.indexOf(input.value) !== -1;
+    });
+    document.querySelectorAll('[data-mobile-combo-free]').forEach(function(textarea) {
+      textarea.value = borrador.libres && borrador.libres[textarea.dataset.mobileComboFree] || '';
+    });
+    window.adminMobilePuntos = Array.isArray(borrador.puntos) ? borrador.puntos : [];
+    window.adminMobileTituloManual = Boolean(borrador.tituloManual);
+    window.adminMobileParteSucia = true;
+    actualizarModoPuntosMobile();
+    renderPuntosMobile();
+    window.adminMobilePasoActual = Math.max(1, Math.min(5, Number(borrador.paso) || 1));
+    mostrarPasoParteMobile(window.adminMobilePasoActual);
+    setMessage('adminMobileMensaje', 'Se recupero el borrador guardado del parte.');
+  }
+
+  function eliminarBorradorParteMobile_() {
+    if (window.adminMobileGuardadoBorradorTimer) clearTimeout(window.adminMobileGuardadoBorradorTimer);
+    window.adminMobileGuardadoBorradorTimer = null;
+    localStorage.removeItem(ADMIN_MOBILE_BORRADOR_KEY);
   }
 
   function cargarPuntosClienteMobile() {
@@ -2936,6 +3034,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
           };
         });
         window.adminMobileParteSucia = true;
+        programarGuardadoBorradorParteMobile_();
         renderPuntosMobile();
         restaurarBotonUi_(estadoBoton);
         setMessage('adminMobileMensaje', puntos.length ? 'Puntos cargados: ' + puntos.length : 'El cliente no tiene plantilla de puntos cargada.');
@@ -2959,12 +3058,14 @@ function ocultarBloqueClienteClasicoUi_(id) {
       observaciones: ''
     });
     window.adminMobileParteSucia = true;
+    programarGuardadoBorradorParteMobile_();
     renderPuntosMobile();
   }
 
   function quitarPuntoMobile(index) {
     window.adminMobilePuntos.splice(index, 1);
     window.adminMobileParteSucia = true;
+    programarGuardadoBorradorParteMobile_();
     renderPuntosMobile();
   }
 
@@ -2972,6 +3073,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
     if (!window.adminMobilePuntos[index]) return;
     window.adminMobilePuntos[index][campo] = valor;
     window.adminMobileParteSucia = true;
+    programarGuardadoBorradorParteMobile_();
   }
 
   function renderPuntosMobile() {
@@ -3074,6 +3176,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
           idPortalCliente: data.idPortalCliente
         };
         window.adminMobileParteSucia = false;
+        eliminarBorradorParteMobile_();
         const detalle = document.getElementById('mobilePostSaveDetalle');
         if (detalle) detalle.textContent = 'Publicacion: ' + res.idPublicacion + '. Puntos cargados: ' + (res.cantidadMonitoreos || 0) + '.';
         const post = document.getElementById('mobilePostSave');
@@ -3099,6 +3202,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
     }
     window.adminMobilePuntos = [];
     window.adminMobileParteSucia = false;
+    eliminarBorradorParteMobile_();
     window.adminMobileTituloManual = false;
     document.querySelectorAll('[data-mobile-combo-check]').forEach(function(input) { input.checked = false; });
     document.querySelectorAll('[data-mobile-combo-free]').forEach(function(textarea) { textarea.value = ''; });
