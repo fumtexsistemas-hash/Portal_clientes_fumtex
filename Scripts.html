@@ -2223,11 +2223,7 @@ function renderPanelClienteAgrupadoLimpioUi_(data, targetId) {
   if (!visitas.length) {
     html += '<div class="empty-state">Todavia no hay visitas publicadas para este cliente.</div>';
   } else {
-    html += '<div class="visitas-cliente-lista">';
-    visitas.forEach(function(visita, index) {
-      html += renderTarjetaVisitaClienteLimpiaUi_(visita, index, targetId || 'cliente');
-    });
-    html += '</div>';
+    html += renderVisitasAgrupadasPorMesClienteUi_(visitas, targetId || 'cliente');
   }
 
   if (documentosGenerales.length) {
@@ -2302,11 +2298,7 @@ function renderPanelAgrupadoHtmlLimpioUi_(data, contexto) {
   if (!visitas.length) {
     html += '<div class="empty-state">Todavia no hay visitas publicadas para este cliente.</div>';
   } else {
-    html += '<div class="visitas-cliente-lista">';
-    visitas.forEach(function(visita, index) {
-      html += renderTarjetaVisitaClienteLimpiaUi_(visita, index, contexto || 'admin');
-    });
-    html += '</div>';
+    html += renderVisitasAgrupadasPorMesClienteUi_(visitas, contexto || 'admin');
   }
 
   if (documentosGenerales.length) {
@@ -2335,7 +2327,70 @@ function renderResumenClienteVisualLimpioUi_(resumen) {
     '</section>';
 }
 
-function renderTarjetaVisitaClienteLimpiaUi_(visita, index, contexto) {
+function renderVisitasAgrupadasPorMesClienteUi_(visitas, contexto) {
+  var grupos = [];
+  var gruposPorClave = {};
+  var ordenadas = (visitas || []).slice().sort(function(a, b) {
+    return obtenerFechaOrdenClienteUi_(b.fechaVisita) - obtenerFechaOrdenClienteUi_(a.fechaVisita);
+  });
+
+  ordenadas.forEach(function(visita) {
+    var periodo = obtenerPeriodoVisitaClienteUi_(visita.fechaVisita);
+    if (!gruposPorClave[periodo.clave]) {
+      gruposPorClave[periodo.clave] = { etiqueta: periodo.etiqueta, visitas: [] };
+      grupos.push(gruposPorClave[periodo.clave]);
+    }
+    gruposPorClave[periodo.clave].visitas.push(visita);
+  });
+
+  var indiceGlobal = 0;
+  return grupos.map(function(grupo) {
+    var total = grupo.visitas.length;
+    var html = '<section class="visitas-mes-cliente"><div class="visitas-mes-encabezado"><div><span class="eyebrow">Historial mensual</span><h3>' +
+      escaparHtmlClienteUi_(grupo.etiqueta) + '</h3></div><strong>' + total + (total === 1 ? ' visita' : ' visitas') + '</strong></div>' +
+      '<div class="visitas-cliente-lista">';
+    grupo.visitas.forEach(function(visita, indexMes) {
+      html += renderTarjetaVisitaClienteLimpiaUi_(visita, indiceGlobal++, contexto, {
+        numero: total - indexMes,
+        total: total
+      });
+    });
+    return html + '</div></section>';
+  }).join('');
+}
+
+function obtenerPeriodoVisitaClienteUi_(fecha) {
+  var texto = String(fecha || '').trim();
+  var matchIso = /^(\d{4})-(\d{2})-(\d{2})/.exec(texto);
+  var matchLocal = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/.exec(texto);
+  var anio;
+  var mes;
+
+  if (matchIso) {
+    anio = Number(matchIso[1]);
+    mes = Number(matchIso[2]);
+  } else if (matchLocal) {
+    mes = Number(matchLocal[2]);
+    anio = Number(matchLocal[3]);
+    if (anio < 100) anio += 2000;
+  } else {
+    var timestamp = obtenerFechaOrdenClienteUi_(fecha);
+    if (timestamp) {
+      var fechaParseada = new Date(timestamp);
+      anio = fechaParseada.getFullYear();
+      mes = fechaParseada.getMonth() + 1;
+    }
+  }
+
+  if (!anio || !mes || mes < 1 || mes > 12) return { clave: 'sin-fecha', etiqueta: 'Visitas sin fecha' };
+  var meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  return {
+    clave: anio + '-' + String(mes).padStart(2, '0'),
+    etiqueta: meses[mes - 1] + ' ' + anio
+  };
+}
+
+function renderTarjetaVisitaClienteLimpiaUi_(visita, index, contexto, posicionMes) {
   var indicadores = visita.indicadores || {};
   var estado = indicadores.estadoVisual || 'Servicio registrado';
   var detalleId = 'detalle-visita-' + (contexto || 'cliente') + '-' + index;
@@ -2343,6 +2398,9 @@ function renderTarjetaVisitaClienteLimpiaUi_(visita, index, contexto) {
     ? escaparHtmlClienteUi_(indicadores.puntosControlados || 0) + '/' + escaparHtmlClienteUi_(indicadores.totalPuntos || 0) + ' puntos controlados'
     : 'Sin puntos de control';
   var idPublicacion = visita.idPublicacion || '';
+  var etiquetaPosicion = posicionMes && posicionMes.total
+    ? '<span class="visita-cliente-posicion">Visita ' + escaparHtmlClienteUi_(posicionMes.numero) + ' de ' + escaparHtmlClienteUi_(posicionMes.total) + '</span>'
+    : '';
   var accionesAdmin = contexto === 'admin' && idPublicacion
     ? '<div class="visita-admin-actions"><button class="secondary-button" type="button" onclick="generarPdfParteServicioAdminUi(\'' + escaparAtributoClienteUi_(idPublicacion) + '\', this)">Ver / descargar PDF</button></div>'
     : '';
@@ -2350,7 +2408,7 @@ function renderTarjetaVisitaClienteLimpiaUi_(visita, index, contexto) {
   return '<article class="visita-cliente-card">' +
     '<button type="button" class="visita-cliente-header" onclick="toggleDetalleVisitaClienteUi(\'' + detalleId + '\')">' +
       '<div class="visita-cliente-main">' +
-        '<span class="visita-cliente-fecha">' + escaparHtmlClienteUi_(formatearFechaClienteUi_(visita.fechaVisita) || '-') + '</span>' +
+        '<div class="visita-cliente-identificacion">' + etiquetaPosicion + '<span class="visita-cliente-fecha">' + escaparHtmlClienteUi_(formatearFechaClienteUi_(visita.fechaVisita) || '-') + '</span></div>' +
         '<strong class="visita-cliente-titulo">' + escaparHtmlClienteUi_(visita.titulo || visita.tipoServicio || 'Servicio realizado') + '</strong>' +
         '<span class="visita-cliente-subtitulo">' + escaparHtmlClienteUi_([visita.tipoServicio || 'Servicio', visita.sucursal || ''].filter(Boolean).join(' - ')) + '</span>' +
       '</div>' +
