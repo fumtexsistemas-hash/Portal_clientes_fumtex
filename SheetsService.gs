@@ -48,15 +48,56 @@ function leerFilasPorHeaders_(hoja) {
 }
 
 function appendPortalRow_(nombreHoja, data) {
+  return appendPortalRows_(nombreHoja, [data]);
+}
+
+function appendPortalRows_(nombreHoja, filas) {
   validarNombreHojaPortal_(nombreHoja);
-  const hoja = obtenerHojaPortal_(nombreHoja);
+  const datos = Array.isArray(filas) ? filas.filter(Boolean) : [];
+  if (!datos.length) return { firstRow: 0, count: 0 };
+
+  return ejecutarConBloqueoPortal_(function() {
+    const hoja = obtenerHojaPortal_(nombreHoja);
+    return appendPortalRowsEnHojaSinLock_(hoja, datos);
+  });
+}
+
+function appendPortalRowsEnHojaSinLock_(hoja, filas) {
+  const datos = Array.isArray(filas) ? filas.filter(Boolean) : [];
+  if (!datos.length) return { firstRow: 0, count: 0 };
+
   const headers = hoja.getRange(1, 1, 1, hoja.getLastColumn()).getValues()[0].map(function(header) {
     return String(header || '').trim();
   });
-  const fila = headers.map(function(header) {
-    return data[header] === undefined ? '' : data[header];
+  if (!headers.length) throw new Error('La hoja ' + hoja.getName() + ' no tiene encabezados.');
+
+  const valores = datos.map(function(data) {
+    return headers.map(function(header) {
+      return data[header] === undefined ? '' : data[header];
+    });
   });
-  hoja.appendRow(fila);
+  const firstRow = hoja.getLastRow() + 1;
+  const ultimaFilaNecesaria = firstRow + valores.length - 1;
+  if (ultimaFilaNecesaria > hoja.getMaxRows()) {
+    hoja.insertRowsAfter(hoja.getMaxRows(), ultimaFilaNecesaria - hoja.getMaxRows());
+  }
+  hoja.getRange(firstRow, 1, valores.length, headers.length).setValues(valores);
+  return { firstRow: firstRow, count: valores.length };
+}
+
+function limpiarFilasPortalAgregadas_(hoja, escritura) {
+  if (!hoja || !escritura || !escritura.firstRow || !escritura.count) return;
+  hoja.getRange(escritura.firstRow, 1, escritura.count, hoja.getLastColumn()).clearContent();
+}
+
+function ejecutarConBloqueoPortal_(callback) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    return callback();
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function generarId_(prefijo) {

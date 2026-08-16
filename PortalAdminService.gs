@@ -184,6 +184,7 @@ function crearVisitaRapidaAdmin(data, adminToken) {
   const contenido = normalizarTexto_(data.contenido) || construirContenidoVisitaRapida_(data);
   const titulo = normalizarTexto_(data.titulo) || ('Servicio ' + normalizarTexto_(data.servicio));
   const fechaVisita = new Date(data.fechaVisita);
+  if (isNaN(fechaVisita.getTime())) throw new Error('La fecha de visita no es valida.');
 
   const publicacion = {
     ID_PUBLICACION: idPublicacion,
@@ -203,17 +204,18 @@ function crearVisitaRapidaAdmin(data, adminToken) {
     USUARIO_CARGA: usuario
   };
 
-  appendPortalRow_(PORTAL_CONFIG.HOJAS.PUBLICACIONES, publicacion);
-
-  let cantidadMonitoreos = 0;
-  monitoreos.forEach(function(punto) {
+  const filasMonitoreos = [];
+  monitoreos.forEach(function(punto, index) {
     if (!punto) return;
     const tieneDato = ['sector', 'puntoControl', 'tipoPunto', 'resultado', 'novedad', 'accionCorrectiva', 'observaciones'].some(function(key) {
       return normalizarTexto_(punto[key]);
     });
     if (!tieneDato) return;
+    if (!normalizarTexto_(punto.sector) || !normalizarTexto_(punto.puntoControl)) {
+      throw new Error('El punto ' + (index + 1) + ' debe tener Sector y Punto de control.');
+    }
 
-    appendPortalRow_(PORTAL_CONFIG.HOJAS.MONITOREOS, {
+    filasMonitoreos.push({
       ID_MONITOREO: generarId_('MON'),
       ID_PUBLICACION: idPublicacion,
       ID_PORTAL_CLIENTE: normalizarTexto_(cliente.ID_PORTAL_CLIENTE),
@@ -229,8 +231,35 @@ function crearVisitaRapidaAdmin(data, adminToken) {
       FECHA_CARGA: new Date(),
       USUARIO_CARGA: usuario
     });
-    cantidadMonitoreos++;
   });
+
+  ejecutarConBloqueoPortal_(function() {
+    const ss = abrirPortalSS_();
+    const hojaPublicaciones = ss.getSheetByName(PORTAL_CONFIG.HOJAS.PUBLICACIONES);
+    const hojaMonitoreos = ss.getSheetByName(PORTAL_CONFIG.HOJAS.MONITOREOS);
+    if (!hojaPublicaciones || !hojaMonitoreos) {
+      throw new Error('Faltan hojas del portal para guardar el parte completo.');
+    }
+
+    let escrituraPublicacion = null;
+    let escrituraMonitoreos = null;
+    try {
+      escrituraPublicacion = appendPortalRowsEnHojaSinLock_(hojaPublicaciones, [publicacion]);
+      escrituraMonitoreos = appendPortalRowsEnHojaSinLock_(hojaMonitoreos, filasMonitoreos);
+      SpreadsheetApp.flush();
+    } catch (error) {
+      try {
+        limpiarFilasPortalAgregadas_(hojaMonitoreos, escrituraMonitoreos);
+        limpiarFilasPortalAgregadas_(hojaPublicaciones, escrituraPublicacion);
+        SpreadsheetApp.flush();
+      } catch (rollbackError) {
+        Logger.log('No se pudo revertir completamente el parte ' + idPublicacion + ': ' + rollbackError.message);
+      }
+      throw new Error('No se pudo guardar el parte completo. No vuelvas a enviarlo sin revisar: ' + error.message);
+    }
+  });
+
+  const cantidadMonitoreos = filasMonitoreos.length;
 
   registrarLog('', publicacion.ID_PORTAL_CLIENTE, 'CREAR_VISITA_RAPIDA', 'OK', idPublicacion + ' - puntos: ' + cantidadMonitoreos);
 
