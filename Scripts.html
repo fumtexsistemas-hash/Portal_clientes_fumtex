@@ -29,7 +29,8 @@
     { id: 'monitoreos', label: 'Monitoreos avanzado' },
     { id: 'documentos', label: 'Documentos externos' },
     { id: 'visibilidad', label: 'Gestionar visibilidad' },
-    { id: 'editarRegistros', label: 'Editar registros' }
+    { id: 'editarRegistros', label: 'Editar registros' },
+    { id: 'estadoPortal', label: 'Estado del portal' }
   ];
   const PORTAL_OPCIONES_FALLBACK = {
     SERVICIO: ['Fumigacion', 'Desratizacion', 'Desinsectacion', 'Desinfeccion', 'Monitoreo MIP', 'Inspeccion'],
@@ -465,6 +466,7 @@
       if (tab === 'plantillaPuntos') {
         llenarOpcionesPlantillaPuntos();
       }
+      if (tab === 'estadoPortal') cargarDiagnosticoPortalAdmin();
     } catch (error) {
       console.error('Error preparando pestana admin', tab, error);
       setMessage('adminMensaje', 'La pestana se abrio, pero hubo un problema preparando algunos datos. Revisa la consola o actualiza listas.', true);
@@ -475,6 +477,46 @@
     ejecutarSeguroAdmin_(cargarClientesAdmin, 'clientes');
     ejecutarSeguroAdmin_(cargarPublicacionesAdmin, 'publicaciones');
     ejecutarSeguroAdmin_(cargarOpcionesPortalAdmin, 'opciones');
+  }
+
+  function cargarDiagnosticoPortalAdmin() {
+    const token = obtenerAdminToken();
+    const target = document.getElementById('diagnosticoPortalResultado');
+    if (!token || !target) return;
+    const estadoBoton = bloquearBotonUi_(document.getElementById('btnDiagnosticoPortal'), 'Analizando...');
+    target.innerHTML = '<article class="panel"><p class="muted">Revisando relaciones y documentos...</p></article>';
+    google.script.run
+      .withSuccessHandler(function(res) {
+        restaurarBotonUi_(estadoBoton);
+        if (!res || !res.ok) {
+          target.innerHTML = '<article class="panel"><p class="message error">No se pudo completar el diagnostico.</p></article>';
+          return;
+        }
+        target.innerHTML = renderDiagnosticoPortalAdmin_(res);
+      })
+      .withFailureHandler(function(error) {
+        restaurarBotonUi_(estadoBoton);
+        target.innerHTML = '<article class="panel"><p class="message error">' + esc(error.message || String(error)) + '</p></article>';
+      })
+      .obtenerDiagnosticoPortalAdmin(token);
+  }
+
+  function renderDiagnosticoPortalAdmin_(data) {
+    const resumen = data.resumen || {};
+    const problemas = data.problemas || [];
+    let html = '<section class="cliente-dashboard-resumen">' +
+      '<div class="cliente-resumen-card"><span class="cliente-resumen-label">Clientes</span><strong>' + esc(resumen.clientes || 0) + '</strong></div>' +
+      '<div class="cliente-resumen-card"><span class="cliente-resumen-label">Sin usuario activo</span><strong>' + esc(resumen.clientesSinUsuario || 0) + '</strong></div>' +
+      '<div class="cliente-resumen-card"><span class="cliente-resumen-label">Relaciones incorrectas</span><strong>' + esc(resumen.relacionesIncorrectas || 0) + '</strong></div>' +
+      '<div class="cliente-resumen-card"><span class="cliente-resumen-label">URLs invalidas</span><strong>' + esc(resumen.urlsInvalidas || 0) + '</strong></div>' +
+      '<div class="cliente-resumen-card"><span class="cliente-resumen-label">PDFs duplicados</span><strong>' + esc(resumen.pdfsDuplicados || 0) + '</strong></div>' +
+    '</section>';
+    if (!problemas.length) return html + '<article class="panel"><h3>Sin observaciones</h3><p class="muted">No se detectaron problemas de integridad.</p></article>';
+    html += '<article class="panel"><h3>Observaciones encontradas</h3><div class="list">';
+    problemas.forEach(function(item) {
+      html += '<div class="item"><strong>' + esc(item.tipo || 'Observacion') + '</strong><small>' + esc(item.id || '') + '</small><p>' + esc(item.detalle || '') + '</p></div>';
+    });
+    return html + '</div></article>';
   }
 
   function cargarOpcionesPortalAdmin() {

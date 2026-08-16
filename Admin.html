@@ -72,6 +72,7 @@
               <button type="button" class="admin-tab" data-admin-tab="documentos" onclick="mostrarAdminTab('documentos')">Documentos externos</button>
               <button type="button" class="admin-tab" data-admin-tab="visibilidad" onclick="mostrarAdminTab('visibilidad')">Gestionar visibilidad</button>
               <button type="button" class="admin-tab" data-admin-tab="editarRegistros" onclick="mostrarAdminTab('editarRegistros')">Editar registros</button>
+              <button type="button" class="admin-tab" data-admin-tab="estadoPortal" onclick="mostrarAdminTab('estadoPortal')">Estado del portal</button>
             </div>
           </details>
         </nav>
@@ -620,6 +621,17 @@
               <h3>Registros editables</h3>
               <p class="muted">Seleccion&aacute; un cliente para editar publicaciones y documentos.</p>
             </article>
+          </section>
+        </section>
+
+        <section id="adminTab-estadoPortal" class="admin-tab-panel hidden">
+          <section class="panel admin-form">
+            <h2>Estado del portal</h2>
+            <p class="muted">Control de integridad de solo lectura. Detecta relaciones incompletas, enlaces inv&aacute;lidos y PDFs repetidos sin modificar registros.</p>
+            <button id="btnDiagnosticoPortal" type="button" onclick="cargarDiagnosticoPortalAdmin()">Analizar portal</button>
+          </section>
+          <section id="diagnosticoPortalResultado">
+            <article class="panel"><p class="muted">Presion&aacute; &ldquo;Analizar portal&rdquo; para revisar los datos actuales.</p></article>
           </section>
         </section>
       </section>

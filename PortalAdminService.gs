@@ -572,6 +572,100 @@ function obtenerVistaClienteAdmin(idPortalCliente, adminToken) {
   };
 }
 
+function obtenerDiagnosticoPortalAdmin(adminToken) {
+  validarAdminToken_(adminToken);
+  const clientes = leerFilasPorHeaders_(obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.CLIENTES));
+  const usuarios = leerFilasPorHeaders_(obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.USUARIOS));
+  const publicaciones = leerFilasPorHeaders_(obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.PUBLICACIONES));
+  const monitoreos = leerFilasPorHeaders_(obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.MONITOREOS));
+  const documentos = leerFilasPorHeaders_(obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.DOCUMENTOS));
+  const clientesPorId = {};
+  const usuariosActivosPorCliente = {};
+  const publicacionesPorId = {};
+  const problemas = [];
+  let relacionesIncorrectas = 0;
+  let urlsInvalidas = 0;
+
+  clientes.forEach(function(row) {
+    const id = normalizarTexto_(row.ID_PORTAL_CLIENTE);
+    if (id) clientesPorId[id] = row;
+  });
+  usuarios.forEach(function(row) {
+    const idCliente = normalizarTexto_(row.ID_PORTAL_CLIENTE);
+    if (idCliente && esSi_(row.ACTIVO)) usuariosActivosPorCliente[idCliente] = true;
+  });
+  publicaciones.forEach(function(row) {
+    const id = normalizarTexto_(row.ID_PUBLICACION);
+    const idCliente = normalizarTexto_(row.ID_PORTAL_CLIENTE);
+    if (id) publicacionesPorId[id] = row;
+    if (!idCliente || !clientesPorId[idCliente]) {
+      relacionesIncorrectas++;
+      problemas.push({ tipo: 'Publicacion sin cliente valido', id: id, detalle: 'ID_PORTAL_CLIENTE: ' + (idCliente || 'vacio') });
+    }
+  });
+
+  const clientesSinUsuario = clientes.filter(function(row) {
+    const id = normalizarTexto_(row.ID_PORTAL_CLIENTE);
+    return esSi_(row.ACTIVO) && id && !usuariosActivosPorCliente[id];
+  });
+  clientesSinUsuario.forEach(function(row) {
+    problemas.push({ tipo: 'Cliente sin usuario activo', id: normalizarTexto_(row.ID_PORTAL_CLIENTE), detalle: normalizarTexto_(row.RAZON_SOCIAL) || normalizarTexto_(row.NOMBRE_FANTASIA) });
+  });
+
+  monitoreos.forEach(function(row) {
+    const id = normalizarTexto_(row.ID_MONITOREO);
+    const idCliente = normalizarTexto_(row.ID_PORTAL_CLIENTE);
+    const idPublicacion = normalizarTexto_(row.ID_PUBLICACION);
+    const publicacion = publicacionesPorId[idPublicacion];
+    if (!clientesPorId[idCliente] || !publicacion || normalizarTexto_(publicacion.ID_PORTAL_CLIENTE) !== idCliente) {
+      relacionesIncorrectas++;
+      problemas.push({ tipo: 'Monitoreo con relacion incorrecta', id: id, detalle: 'Cliente ' + (idCliente || '-') + ' / Publicacion ' + (idPublicacion || '-') });
+    }
+  });
+
+  const pdfsVisiblesPorPublicacion = {};
+  documentos.forEach(function(row) {
+    const id = normalizarTexto_(row.ID_DOCUMENTO);
+    const idCliente = normalizarTexto_(row.ID_PORTAL_CLIENTE);
+    const idPublicacion = normalizarTexto_(row.ID_PUBLICACION);
+    const url = normalizarTexto_(row.URL);
+    const publicacion = idPublicacion ? publicacionesPorId[idPublicacion] : null;
+    if (!clientesPorId[idCliente] || (idPublicacion && (!publicacion || normalizarTexto_(publicacion.ID_PORTAL_CLIENTE) !== idCliente))) {
+      relacionesIncorrectas++;
+      problemas.push({ tipo: 'Documento con relacion incorrecta', id: id, detalle: 'Cliente ' + (idCliente || '-') + ' / Publicacion ' + (idPublicacion || 'general') });
+    }
+    if (!/^https:\/\/[^\s<>"']+$/i.test(url)) {
+      urlsInvalidas++;
+      problemas.push({ tipo: 'Documento con URL invalida', id: id, detalle: url || 'URL vacia' });
+    }
+    if (idPublicacion && esSi_(row.VISIBLE) && normalizarClave_(row.TIPO) === 'parte de servicio pdf') {
+      if (!pdfsVisiblesPorPublicacion[idPublicacion]) pdfsVisiblesPorPublicacion[idPublicacion] = [];
+      pdfsVisiblesPorPublicacion[idPublicacion].push(id);
+    }
+  });
+
+  let pdfsDuplicados = 0;
+  Object.keys(pdfsVisiblesPorPublicacion).forEach(function(idPublicacion) {
+    const ids = pdfsVisiblesPorPublicacion[idPublicacion];
+    if (ids.length < 2) return;
+    pdfsDuplicados += ids.length - 1;
+    problemas.push({ tipo: 'PDFs visibles duplicados', id: idPublicacion, detalle: ids.join(', ') });
+  });
+
+  return {
+    ok: true,
+    resumen: {
+      clientes: clientes.length,
+      clientesSinUsuario: clientesSinUsuario.length,
+      relacionesIncorrectas: relacionesIncorrectas,
+      urlsInvalidas: urlsInvalidas,
+      pdfsDuplicados: pdfsDuplicados
+    },
+    problemas: problemas.slice(0, 200),
+    totalProblemas: problemas.length
+  };
+}
+
 function obtenerGestionClienteAdmin(idPortalCliente, adminToken) {
   validarAdminToken_(adminToken);
   const id = normalizarTexto_(idPortalCliente);
