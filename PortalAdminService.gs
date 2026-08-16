@@ -153,13 +153,14 @@ function crearDocumentoAdmin(data, adminToken) {
   const usuario = validarAdminToken_(adminToken);
   validarDataAdmin_(data, ['idPortalCliente', 'titulo', 'url']);
   const cliente = obtenerClientePortalActivoPorId_(data.idPortalCliente);
+  const urlDocumento = validarUrlDocumentoAdmin_(data.url);
   const row = {
     ID_DOCUMENTO: normalizarTexto_(data.idDocumento) || generarId_('DOC'),
     ID_PORTAL_CLIENTE: normalizarTexto_(cliente.ID_PORTAL_CLIENTE),
     ID_PUBLICACION: normalizarTexto_(data.idPublicacion),
     TITULO: normalizarTexto_(data.titulo),
     TIPO: normalizarTexto_(data.tipo),
-    URL: normalizarTexto_(data.url),
+    URL: urlDocumento,
     CARPETA_DRIVE_ID: normalizarTexto_(data.carpetaDriveId),
     DESCRIPCION: normalizarTexto_(data.descripcion),
     VISIBLE: normalizarSiNo_(data.visible),
@@ -775,6 +776,15 @@ function actualizarDocumentoAdmin(idDocumento, data, adminToken) {
   );
 }
 
+function validarUrlDocumentoAdmin_(valor) {
+  const url = normalizarTexto_(valor);
+  if (!url) throw new Error('Falta la URL del documento.');
+  if (!/^https:\/\/[^\s]+$/i.test(url)) {
+    throw new Error('La URL del documento debe ser un enlace seguro que comience con https://.');
+  }
+  return url;
+}
+
 function cambiarVisiblePublicacionAdmin(idPublicacion, visible, adminToken) {
   validarAdminToken_(adminToken);
   return cambiarVisibleRegistroPortal_(
@@ -1348,6 +1358,8 @@ function actualizarRegistroPortalPorId_(nombreHoja, idHeader, idRegistro, data, 
       }
     } else if (header === 'FECHA_VISITA') {
       valor = valor ? new Date(valor) : '';
+    } else if (header === 'URL') {
+      valor = validarUrlDocumentoAdmin_(valor);
     } else {
       valor = normalizarTexto_(valor);
     }
