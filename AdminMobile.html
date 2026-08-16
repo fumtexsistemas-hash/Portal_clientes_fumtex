@@ -69,6 +69,9 @@
               <span id="adminMobileStepLabel">Paso 1 de 5</span>
               <strong id="adminMobileStepTitle">Cliente y fecha</strong>
             </div>
+            <div class="mobile-progress" aria-hidden="true">
+              <span id="adminMobileProgressBar"></span>
+            </div>
 
             <div class="mobile-step" data-mobile-step="1">
               <h2>Cliente y fecha</h2>
@@ -140,7 +143,7 @@
               </fieldset>
               <div id="mobilePuntosWrap">
                 <div class="mobile-stack-actions">
-                  <button class="mobile-secondary-button" type="button" onclick="cargarPuntosClienteMobile()">Cargar puntos del cliente</button>
+                  <button id="mobileCargarPuntosButton" class="mobile-secondary-button" type="button" onclick="cargarPuntosClienteMobile()">Cargar puntos del cliente</button>
                   <button class="mobile-secondary-button" type="button" onclick="agregarPuntoMobile()">Agregar punto manual</button>
                 </div>
                 <div id="mobilePuntosLista" class="mobile-points-list"></div>
@@ -153,7 +156,7 @@
             </div>
 
             <div class="mobile-wizard-nav">
-              <button class="secondary-button" type="button" onclick="mostrarPasoParteMobile(window.adminMobilePasoActual - 1)">Anterior</button>
+              <button id="mobilePreviousButton" class="secondary-button" type="button" onclick="mostrarPasoParteMobile(window.adminMobilePasoActual - 1)">Anterior</button>
               <button id="mobileNextButton" class="mobile-primary-button" type="button" onclick="mostrarPasoParteMobile(window.adminMobilePasoActual + 1)">Siguiente</button>
               <button id="mobileSaveButton" class="mobile-primary-button hidden" type="submit">Guardar parte de servicio</button>
             </div>
@@ -305,7 +308,7 @@
                 <option value="">Selecciona cliente</option>
               </select>
             </label>
-            <button class="mobile-primary-button" type="button" onclick="cargarVistaClienteMobile()">Ver visitas</button>
+            <button id="mobileVistaClienteButton" class="mobile-primary-button" type="button" onclick="cargarVistaClienteMobile()">Ver visitas</button>
             <div id="mobileVistaClienteResultado" class="mobile-card-list"></div>
           </div>
         </section>
@@ -336,7 +339,7 @@
                 <option value="">Selecciona cliente</option>
               </select>
             </label>
-            <button class="mobile-primary-button" type="button" onclick="cargarPlantillaPuntosMobile()">Cargar plantilla</button>
+            <button id="mobilePlantillaButton" class="mobile-primary-button" type="button" onclick="cargarPlantillaPuntosMobile()">Cargar plantilla</button>
             <div id="mobilePlantillaPuntosResultado" class="mobile-card-list"></div>
           </div>
         </section>

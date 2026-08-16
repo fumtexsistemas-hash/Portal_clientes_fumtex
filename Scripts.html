@@ -2815,8 +2815,12 @@ function ocultarBloqueClienteClasicoUi_(id) {
     const titulos = ['Cliente y fecha', 'Servicio', 'Informe', 'Puntos controlados', 'Revisar y guardar'];
     const label = document.getElementById('adminMobileStepLabel');
     const title = document.getElementById('adminMobileStepTitle');
+    const progress = document.getElementById('adminMobileProgressBar');
+    const previous = document.getElementById('mobilePreviousButton');
     if (label) label.textContent = 'Paso ' + paso + ' de ' + total;
     if (title) title.textContent = titulos[paso - 1];
+    if (progress) progress.style.width = Math.round((paso / total) * 100) + '%';
+    if (previous) previous.disabled = paso === 1;
     const next = document.getElementById('mobileNextButton');
     const save = document.getElementById('mobileSaveButton');
     if (next) next.classList.toggle('hidden', paso === total);
@@ -2864,6 +2868,8 @@ function ocultarBloqueClienteClasicoUi_(id) {
       mostrarPasoParteMobile(1);
       return;
     }
+    const estadoBoton = bloquearBotonUi_(document.getElementById('mobileCargarPuntosButton'), 'Cargando puntos...');
+    if (!estadoBoton) return;
     setMessage('adminMobileMensaje', 'Cargando puntos del cliente...');
     google.script.run
       .withSuccessHandler(function(res) {
@@ -2881,10 +2887,12 @@ function ocultarBloqueClienteClasicoUi_(id) {
         });
         window.adminMobileParteSucia = true;
         renderPuntosMobile();
+        restaurarBotonUi_(estadoBoton);
         setMessage('adminMobileMensaje', puntos.length ? 'Puntos cargados: ' + puntos.length : 'El cliente no tiene plantilla de puntos cargada.');
       })
       .withFailureHandler(function(error) {
         setMessage('adminMobileMensaje', error.message || String(error), true);
+        restaurarBotonUi_(estadoBoton);
       })
       .listarPuntosActivosClienteAdmin(idCliente, token);
   }
@@ -3020,6 +3028,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
         if (detalle) detalle.textContent = 'Publicacion: ' + res.idPublicacion + '. Puntos cargados: ' + (res.cantidadMonitoreos || 0) + '.';
         const post = document.getElementById('mobilePostSave');
         if (post) post.classList.remove('hidden');
+        if (form) form.classList.add('hidden');
         restaurarBotonUi_(estadoBoton);
         setMessage('adminMobileMensaje', 'Parte guardado correctamente.');
         cargarPublicacionesAdminMobile();
@@ -3034,7 +3043,10 @@ function ocultarBloqueClienteClasicoUi_(id) {
   function cargarOtroParteMobile(forzar) {
     if (!forzar && window.adminMobileParteSucia && !confirm('Hay datos sin guardar. ¿Limpiar el parte?')) return;
     const form = document.getElementById('adminMobileParteForm');
-    if (form) form.reset();
+    if (form) {
+      form.reset();
+      form.classList.remove('hidden');
+    }
     window.adminMobilePuntos = [];
     window.adminMobileParteSucia = false;
     window.adminMobileTituloManual = false;
@@ -3063,19 +3075,24 @@ function ocultarBloqueClienteClasicoUi_(id) {
       if (target) target.innerHTML = '<p class="muted">Selecciona un cliente.</p>';
       return;
     }
+    const estadoBoton = bloquearBotonUi_(document.getElementById('mobileVistaClienteButton'), 'Cargando visitas...');
+    if (!estadoBoton) return;
     if (target) target.innerHTML = '<p class="muted">Cargando visitas...</p>';
     google.script.run
       .withSuccessHandler(function(res) {
         if (!res || !res.ok) {
           target.innerHTML = '<p class="message error">No se pudo cargar la vista.</p>';
+          restaurarBotonUi_(estadoBoton);
           return;
         }
         const publicaciones = res.publicaciones || [];
         const documentos = res.documentos || [];
         target.innerHTML = renderVistaClienteMobile_(res.cliente, publicaciones, documentos);
+        restaurarBotonUi_(estadoBoton);
       })
       .withFailureHandler(function(error) {
         target.innerHTML = '<p class="message error">' + esc(error.message || String(error)) + '</p>';
+        restaurarBotonUi_(estadoBoton);
       })
       .obtenerVistaClienteAdmin(idCliente, token);
   }
@@ -3298,6 +3315,8 @@ function ocultarBloqueClienteClasicoUi_(id) {
       if (target) target.innerHTML = '<p class="muted">Selecciona un cliente.</p>';
       return;
     }
+    const estadoBoton = bloquearBotonUi_(document.getElementById('mobilePlantillaButton'), 'Cargando plantilla...');
+    if (!estadoBoton) return;
     if (target) target.innerHTML = '<p class="muted">Cargando plantilla...</p>';
     google.script.run
       .withSuccessHandler(function(res) {
@@ -3305,9 +3324,11 @@ function ocultarBloqueClienteClasicoUi_(id) {
         target.innerHTML = puntos.length ? puntos.map(function(punto) {
           return '<article class="mobile-result-card"><strong>' + esc(punto.sector || '') + ' - ' + esc(punto.puntoControl || '') + '</strong><small>' + esc(punto.tipoPunto || '') + '</small><p>' + esc(punto.resultadoDefault || '') + ' / ' + esc(punto.accionCorrectivaDefault || '') + '</p></article>';
         }).join('') : '<p class="muted">Sin puntos activos para este cliente.</p>';
+        restaurarBotonUi_(estadoBoton);
       })
       .withFailureHandler(function(error) {
         target.innerHTML = '<p class="message error">' + esc(error.message || String(error)) + '</p>';
+        restaurarBotonUi_(estadoBoton);
       })
       .listarPuntosActivosClienteAdmin(idCliente, token);
   }
