@@ -282,6 +282,14 @@
 
   function inicializarPantallaAdmin() {
     console.log('inicializarPantallaAdmin');
+    if (!window.portalAdminBeforeUnloadConfigurado) {
+      window.portalAdminBeforeUnloadConfigurado = true;
+      window.addEventListener('beforeunload', function(event) {
+        if (!window.portalVisitaRapidaSucia) return;
+        event.preventDefault();
+        event.returnValue = '';
+      });
+    }
     asegurarPestanasAdminCompletas();
     const token = sessionStorage.getItem('portalAdminToken');
     if (token) {
@@ -448,7 +456,7 @@
         cargarOpcionesCargaRapidaAdmin();
       }
       if (tab === 'visitaRapida' && !document.querySelector('#visitaRapidaPuntos .visita-punto')) {
-        agregarPuntoVisitaRapida();
+        agregarPuntoVisitaRapida(null, false);
       }
       if (tab === 'visitaRapida') {
         actualizarModoPuntosVisitaRapida();
@@ -643,7 +651,7 @@
     llenarSelectOpcionesPortal('selectPuntoClienteAccion', 'ACCION_CORRECTIVA', 'Selecciona accion');
   }
 
-  function agregarPuntoVisitaRapida(punto) {
+  function agregarPuntoVisitaRapida(punto, registrarCambio) {
     const target = document.getElementById('visitaRapidaPuntos');
     if (!target) return;
     const index = window.portalVisitaRapidaPuntos++;
@@ -668,12 +676,14 @@
       if (punto.resultado) wrapper.querySelector('[name="resultado"]').value = punto.resultado;
       if (punto.accionCorrectiva) wrapper.querySelector('[name="accionCorrectiva"]').value = punto.accionCorrectiva;
     }
+    if (registrarCambio !== false) window.portalVisitaRapidaSucia = true;
     actualizarPreviewVisitaRapida();
   }
 
   function quitarPuntoVisitaRapida(button) {
     const item = button ? button.closest('.visita-punto') : null;
     if (item) item.remove();
+    window.portalVisitaRapidaSucia = true;
     renumerarPuntosVisitaRapida();
     actualizarPreviewVisitaRapida();
   }
@@ -693,7 +703,7 @@
     window.portalVisitaTituloManual = false;
     window.portalUltimaVisitaRapida = null;
     window.portalVisitaRapidaSucia = false;
-    agregarPuntoVisitaRapida();
+    agregarPuntoVisitaRapida(null, false);
     llenarOpcionesVisitaRapida();
     limpiarOpcionesTextoServicio();
     actualizarModoPuntosVisitaRapida();
@@ -729,7 +739,7 @@
     const mostrar = !form.elements.incluyePuntos || form.elements.incluyePuntos.value !== 'NO';
     wrap.classList.toggle('hidden', !mostrar);
     if (mostrar && !document.querySelector('#visitaRapidaPuntos .visita-punto')) {
-      agregarPuntoVisitaRapida();
+      agregarPuntoVisitaRapida(null, false);
     }
     actualizarPreviewVisitaRapida();
   }
@@ -981,25 +991,31 @@
       setMessage('adminMensaje', 'Selecciona un cliente antes de guardar puntos.', true);
       return;
     }
+    if (!form.reportValidity()) return;
 
     const data = formToObject(form);
     data.idPortalCliente = clienteSelect.value;
     const idPunto = data.idPuntoCliente || '';
     delete data.idPuntoCliente;
+    const estadoBoton = bloquearEnvioFormularioUi_(form, idPunto ? 'Actualizando...' : 'Guardando...');
+    if (!estadoBoton) return;
     setMessage('adminMensaje', idPunto ? 'Actualizando punto...' : 'Guardando punto...');
 
     const runner = google.script.run
       .withSuccessHandler(function(res) {
         if (!res || !res.ok) {
           setMessage('adminMensaje', res && res.mensaje ? res.mensaje : 'No se pudo guardar el punto.', true);
+          restaurarBotonUi_(estadoBoton);
           return;
         }
         setMessage('adminMensaje', res.mensaje || 'Punto guardado.');
+        restaurarBotonUi_(estadoBoton);
         limpiarFormPuntoCliente();
         cargarPlantillaPuntosAdmin();
       })
       .withFailureHandler(function(error) {
         setMessage('adminMensaje', error.message || String(error), true);
+        restaurarBotonUi_(estadoBoton);
       });
 
     if (idPunto) {
