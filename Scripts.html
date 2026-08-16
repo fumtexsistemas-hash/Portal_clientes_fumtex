@@ -2537,6 +2537,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
   window.adminMobileUltimaPublicacion = window.adminMobileUltimaPublicacion || null;
   window.adminMobileParteSucia = window.adminMobileParteSucia || false;
   window.adminMobilePdfEnProceso = window.adminMobilePdfEnProceso || false;
+  window.adminMobileTituloManual = window.adminMobileTituloManual || false;
 
   function inicializarAdminMobile() {
     console.log('inicializarAdminMobile');
@@ -2574,6 +2575,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
     if (login) login.classList.add('hidden');
     if (panel) panel.classList.remove('hidden');
     mostrarSeccionAdminMobile(sessionStorage.getItem('adminMobileSeccionActiva') || 'parte');
+    prepararNuevoParteMobile_();
     mostrarPasoParteMobile(1);
   }
 
@@ -2738,6 +2740,40 @@ function ocultarBloqueClienteClasicoUi_(id) {
     renderPuntosMobile();
   }
 
+  function prepararNuevoParteMobile_() {
+    const form = document.getElementById('adminMobileParteForm');
+    if (!form) return;
+    if (form.elements.fechaVisita && !form.elements.fechaVisita.value) {
+      const hoy = new Date();
+      const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+      const dia = String(hoy.getDate()).padStart(2, '0');
+      form.elements.fechaVisita.value = hoy.getFullYear() + '-' + mes + '-' + dia;
+    }
+    actualizarModoPuntosMobile();
+  }
+
+  function marcarTituloParteMobileManual() {
+    window.adminMobileTituloManual = true;
+  }
+
+  function autocompletarTituloParteMobile() {
+    const form = document.getElementById('adminMobileParteForm');
+    if (!form || window.adminMobileTituloManual) return;
+    const servicio = obtenerTextoSelect(form.elements.servicio);
+    const tipo = obtenerTextoSelect(form.elements.tipoIntervencion);
+    if (servicio && tipo && form.elements.titulo) {
+      form.elements.titulo.value = ('Servicio ' + tipo.toLowerCase() + ' de ' + servicio.toLowerCase()).replace(/\s+/g, ' ').trim();
+    }
+  }
+
+  function actualizarModoPuntosMobile() {
+    const form = document.getElementById('adminMobileParteForm');
+    const wrap = document.getElementById('mobilePuntosWrap');
+    if (!form || !wrap) return;
+    const mostrar = !form.elements.incluyePuntos || form.elements.incluyePuntos.value !== 'NO';
+    wrap.classList.toggle('hidden', !mostrar);
+  }
+
   function llenarSelectMobileOpciones(selectId, grupo, placeholder) {
     const select = document.getElementById(selectId);
     if (!select) return;
@@ -2805,6 +2841,8 @@ function ocultarBloqueClienteClasicoUi_(id) {
   }
 
   function validarPuntosParteMobile_() {
+    const form = document.getElementById('adminMobileParteForm');
+    if (form && form.elements.incluyePuntos && form.elements.incluyePuntos.value === 'NO') return true;
     const incompleto = (window.adminMobilePuntos || []).find(function(punto) {
       return !String(punto.sector || '').trim() || !String(punto.puntoControl || '').trim();
     });
@@ -2942,7 +2980,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
     target.innerHTML = '<div><span>Cliente</span><strong>' + esc(cliente ? textoClienteAdmin(cliente) : 'Sin seleccionar') + '</strong></div>' +
       '<div><span>Fecha</span><strong>' + esc(data.fechaVisita || 'Sin fecha') + '</strong></div>' +
       '<div><span>Servicio</span><strong>' + esc(data.servicio || 'Sin servicio') + '</strong></div>' +
-      '<div><span>Cantidad de puntos</span><strong>' + esc(String((window.adminMobilePuntos || []).length)) + '</strong></div>' +
+      '<div><span>Puntos de monitoreo</span><strong>' + esc(data.incluyePuntos === 'NO' ? 'No corresponde' : String((window.adminMobilePuntos || []).length) + ' punto(s)') + '</strong></div>' +
       '<div><span>Visible</span><strong>' + esc(data.visible || 'SI') + '</strong></div>';
   }
 
@@ -2964,7 +3002,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
     if (!estadoBoton) return;
     const data = formToObject(form);
     prepararTextoInformeMobile(data);
-    data.monitoreos = window.adminMobilePuntos || [];
+    data.monitoreos = data.incluyePuntos === 'NO' ? [] : (window.adminMobilePuntos || []);
     setMessage('adminMobileMensaje', 'Guardando parte de servicio...');
     google.script.run
       .withSuccessHandler(function(res) {
@@ -2999,11 +3037,13 @@ function ocultarBloqueClienteClasicoUi_(id) {
     if (form) form.reset();
     window.adminMobilePuntos = [];
     window.adminMobileParteSucia = false;
+    window.adminMobileTituloManual = false;
     document.querySelectorAll('[data-mobile-combo-check]').forEach(function(input) { input.checked = false; });
     document.querySelectorAll('[data-mobile-combo-free]').forEach(function(textarea) { textarea.value = ''; });
     const post = document.getElementById('mobilePostSave');
     if (post) post.classList.add('hidden');
     renderPuntosMobile();
+    prepararNuevoParteMobile_();
     mostrarPasoParteMobile(1);
   }
 

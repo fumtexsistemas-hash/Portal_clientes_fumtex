@@ -94,16 +94,16 @@
             <div class="mobile-step hidden" data-mobile-step="2">
               <h2>Servicio</h2>
               <label>Servicio realizado
-                <select id="mobileSelectServicio" name="servicio" required></select>
+                <select id="mobileSelectServicio" name="servicio" required onchange="autocompletarTituloParteMobile()"></select>
               </label>
               <label>Tipo de intervencion
-                <select id="mobileSelectTipoIntervencion" name="tipoIntervencion" required></select>
+                <select id="mobileSelectTipoIntervencion" name="tipoIntervencion" required onchange="autocompletarTituloParteMobile()"></select>
               </label>
               <label>Caracter del servicio
                 <select id="mobileSelectCaracterServicio" name="caracterServicio" required></select>
               </label>
               <label>Titulo para cliente
-                <input name="titulo" placeholder="Ej: Informe de servicio preventivo">
+                <input id="mobileTituloParte" name="titulo" placeholder="Se completa autom&aacute;ticamente" oninput="marcarTituloParteMobileManual()">
               </label>
             </div>
 
@@ -133,11 +133,18 @@
 
             <div class="mobile-step hidden" data-mobile-step="4">
               <h2>Puntos controlados</h2>
-              <div class="mobile-stack-actions">
-                <button class="mobile-secondary-button" type="button" onclick="cargarPuntosClienteMobile()">Cargar puntos del cliente</button>
-                <button class="mobile-secondary-button" type="button" onclick="agregarPuntoMobile()">Agregar punto manual</button>
+              <fieldset class="choice-box mobile-choice-box">
+                <legend>&iquest;Se controlaron cajas o puntos de monitoreo?</legend>
+                <label><input type="radio" name="incluyePuntos" value="SI" checked onchange="actualizarModoPuntosMobile()"> S&iacute;, cargar puntos</label>
+                <label><input type="radio" name="incluyePuntos" value="NO" onchange="actualizarModoPuntosMobile()"> No corresponde en esta visita</label>
+              </fieldset>
+              <div id="mobilePuntosWrap">
+                <div class="mobile-stack-actions">
+                  <button class="mobile-secondary-button" type="button" onclick="cargarPuntosClienteMobile()">Cargar puntos del cliente</button>
+                  <button class="mobile-secondary-button" type="button" onclick="agregarPuntoMobile()">Agregar punto manual</button>
+                </div>
+                <div id="mobilePuntosLista" class="mobile-points-list"></div>
               </div>
-              <div id="mobilePuntosLista" class="mobile-points-list"></div>
             </div>
 
             <div class="mobile-step hidden" data-mobile-step="5">
