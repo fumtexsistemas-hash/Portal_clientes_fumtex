@@ -2873,7 +2873,12 @@ function ocultarBloqueClienteClasicoUi_(id) {
     setMessage('adminMobileMensaje', 'Cargando puntos del cliente...');
     google.script.run
       .withSuccessHandler(function(res) {
-        const puntos = res && res.ok ? (res.puntos || []) : [];
+        if (!res || !res.ok) {
+          setMessage('adminMobileMensaje', res && res.mensaje ? res.mensaje : 'No se pudieron cargar los puntos del cliente.', true);
+          restaurarBotonUi_(estadoBoton);
+          return;
+        }
+        const puntos = res.puntos || [];
         window.adminMobilePuntos = puntos.map(function(punto) {
           return {
             sector: punto.sector || '',
@@ -3098,12 +3103,15 @@ function ocultarBloqueClienteClasicoUi_(id) {
   }
 
   function renderVistaClienteMobile_(cliente, publicaciones, documentos) {
-    const header = '<article class="mobile-result-card"><strong>' + esc(cliente && (cliente.razonSocial || cliente.nombreFantasia) || 'Cliente') + '</strong><small>CUIT: ' + esc(cliente && cliente.cuit || '') + '</small></article>';
-    const cards = publicaciones.length ? publicaciones.map(function(pub) {
+    const publicacionesOrdenadas = (publicaciones || []).slice().sort(function(a, b) {
+      return obtenerFechaOrdenClienteUi_(b.fechaVisita || b.fechaCarga) - obtenerFechaOrdenClienteUi_(a.fechaVisita || a.fechaCarga);
+    });
+    const header = '<article class="mobile-result-card"><strong>' + esc(cliente && (cliente.razonSocial || cliente.nombreFantasia) || 'Cliente') + '</strong><small>CUIT: ' + esc(cliente && cliente.cuit || '') + '</small><span>' + publicacionesOrdenadas.length + ' visita(s) visible(s)</span></article>';
+    const cards = publicacionesOrdenadas.length ? publicacionesOrdenadas.map(function(pub) {
       const docs = documentos.filter(function(doc) { return doc.idPublicacion === pub.idPublicacion; });
       return '<article class="mobile-result-card"><span>' + esc(pub.fechaVisita || '') + '</span><strong>' + esc(pub.titulo || pub.tipoServicio || 'Visita') + '</strong><p>' + esc(pub.resumenCliente || '') + '</p>' +
-        '<button type="button" class="mobile-secondary-button" onclick="generarPdfParteMobile(\'' + esc(pub.idPublicacion) + '\')">Generar PDF</button>' +
-        docs.map(function(doc) { return '<a class="mobile-link-button" target="_blank" href="' + esc(doc.url || '') + '">Abrir PDF</a>'; }).join('') +
+        '<button type="button" class="mobile-secondary-button" onclick="generarPdfParteMobile(\'' + esc(pub.idPublicacion) + '\', this)">Generar PDF</button>' +
+        docs.map(function(doc) { return '<a class="mobile-link-button" target="_blank" rel="noopener" href="' + esc(doc.url || '') + '">Abrir PDF</a>'; }).join('') +
       '</article>';
     }).join('') : '<p class="muted">Sin publicaciones visibles.</p>';
     return header + cards;
@@ -3258,16 +3266,16 @@ function ocultarBloqueClienteClasicoUi_(id) {
     return [pub.fechaVisita, pub.tipoServicio, pub.sucursal, pub.idPublicacion].filter(Boolean).join(' - ');
   }
 
-  function generarPdfDesdeSelectMobile() {
+  function generarPdfDesdeSelectMobile(button) {
     const id = document.getElementById('mobileSelectPublicacionPdf').value;
     if (!id) {
       setMessage('adminMobileMensaje', 'Selecciona una publicacion.', true);
       return;
     }
-    generarPdfParteMobile(id);
+    generarPdfParteMobile(id, button);
   }
 
-  function generarPdfParteMobile(idPublicacion) {
+  function generarPdfParteMobile(idPublicacion, button) {
     const id = idPublicacion || (window.adminMobileUltimaPublicacion && window.adminMobileUltimaPublicacion.idPublicacion) || '';
     const token = obtenerAdminToken();
     const target = document.getElementById('mobilePdfResultado');
@@ -3281,7 +3289,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
     }
     if (!confirm('Se generara y publicara el PDF en el portal del cliente. ¿Continuar?')) return;
     window.adminMobilePdfEnProceso = true;
-    const estadoBoton = bloquearBotonUi_(document.getElementById('mobileGenerarPdfButton'), 'Generando PDF...');
+    const estadoBoton = bloquearBotonUi_(button || document.getElementById('mobileGenerarPdfButton'), 'Generando PDF...');
     setMessage('adminMobileMensaje', 'Generando PDF...');
     google.script.run
       .withSuccessHandler(function(res) {
@@ -3293,7 +3301,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
         }
         setMessage('adminMobileMensaje', res.mensaje || 'PDF generado correctamente.');
         if (target) {
-          target.innerHTML = '<article class="mobile-result-card"><strong>' + esc(res.nombreArchivo || 'PDF generado') + '</strong><a class="mobile-link-button" target="_blank" href="' + esc(res.url || '') + '">Abrir PDF</a></article>';
+          target.innerHTML = '<article class="mobile-result-card"><strong>' + esc(res.nombreArchivo || 'PDF generado') + '</strong><a class="mobile-link-button" target="_blank" rel="noopener" href="' + esc(res.url || '') + '">Abrir PDF</a></article>';
         }
         window.adminMobilePdfEnProceso = false;
         restaurarBotonUi_(estadoBoton);
@@ -3320,7 +3328,12 @@ function ocultarBloqueClienteClasicoUi_(id) {
     if (target) target.innerHTML = '<p class="muted">Cargando plantilla...</p>';
     google.script.run
       .withSuccessHandler(function(res) {
-        const puntos = res && res.ok ? (res.puntos || []) : [];
+        if (!res || !res.ok) {
+          target.innerHTML = '<p class="message error">' + esc(res && res.mensaje ? res.mensaje : 'No se pudo cargar la plantilla.') + '</p>';
+          restaurarBotonUi_(estadoBoton);
+          return;
+        }
+        const puntos = res.puntos || [];
         target.innerHTML = puntos.length ? puntos.map(function(punto) {
           return '<article class="mobile-result-card"><strong>' + esc(punto.sector || '') + ' - ' + esc(punto.puntoControl || '') + '</strong><small>' + esc(punto.tipoPunto || '') + '</small><p>' + esc(punto.resultadoDefault || '') + ' / ' + esc(punto.accionCorrectivaDefault || '') + '</p></article>';
         }).join('') : '<p class="muted">Sin puntos activos para este cliente.</p>';

@@ -167,7 +167,7 @@
             <p id="mobilePostSaveDetalle" class="muted"></p>
             <div class="mobile-stack-actions">
               <button class="mobile-secondary-button" type="button" onclick="verComoClienteMobile()">Ver como cliente</button>
-              <button class="mobile-secondary-button" type="button" onclick="generarPdfParteMobile()">Generar PDF</button>
+              <button class="mobile-secondary-button" type="button" onclick="generarPdfParteMobile('', this)">Generar PDF</button>
               <button class="mobile-primary-button" type="button" onclick="cargarOtroParteMobile()">Cargar otro parte</button>
             </div>
           </div>
@@ -326,7 +326,7 @@
                 <option value="">Selecciona publicacion</option>
               </select>
             </label>
-            <button id="mobileGenerarPdfButton" class="mobile-primary-button" type="button" onclick="generarPdfDesdeSelectMobile()">Generar PDF</button>
+            <button id="mobileGenerarPdfButton" class="mobile-primary-button" type="button" onclick="generarPdfDesdeSelectMobile(this)">Generar PDF</button>
             <div id="mobilePdfResultado" class="mobile-card-list"></div>
           </div>
         </section>
