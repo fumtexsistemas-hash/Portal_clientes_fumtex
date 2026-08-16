@@ -814,26 +814,70 @@ function generarPdfParteServicioAdmin(idPublicacion, adminToken) {
   const id = normalizarTexto_(idPublicacion);
   if (!id) throw new Error('Falta ID_PUBLICACION.');
 
-  const datos = obtenerDatosParteServicioPdf_(id);
-  const pdfInfo = crearDocumentoPdfParteServicio_(datos);
-  const archivoPdf = guardarPdfParteServicio_(datos, pdfInfo.pdfBlob);
+  const resultado = ejecutarConBloqueoPortal_(function() {
+    const documentoExistente = obtenerDocumentoPdfParteExistente_(id);
+    if (documentoExistente) {
+      return {
+        ok: true,
+        reutilizado: true,
+        idDocumento: documentoExistente.ID_DOCUMENTO,
+        url: documentoExistente.URL,
+        nombreArchivo: documentoExistente.TITULO,
+        mensaje: 'Este parte ya tenia un PDF generado. Se abrio el documento existente.'
+      };
+    }
 
-  try {
-    DriveApp.getFileById(pdfInfo.documentoId).setTrashed(true);
-  } catch (error) {
-    Logger.log('No se pudo enviar a papelera el documento temporal: ' + error.message);
+    const datos = obtenerDatosParteServicioPdf_(id);
+    let pdfInfo;
+    let archivoPdf;
+
+    try {
+      pdfInfo = crearDocumentoPdfParteServicio_(datos);
+      archivoPdf = guardarPdfParteServicio_(datos, pdfInfo.pdfBlob);
+      const documento = registrarDocumentoPdfParteServicioSinLock_(datos, archivoPdf, usuario);
+
+      return {
+        ok: true,
+        reutilizado: false,
+        idPortalCliente: datos.cliente.idPortalCliente,
+        idDocumento: documento.ID_DOCUMENTO,
+        url: archivoPdf.getUrl(),
+        nombreArchivo: archivoPdf.getName(),
+        mensaje: 'PDF generado correctamente. El cliente ya puede abrirlo desde su portal.'
+      };
+    } catch (error) {
+      if (archivoPdf) enviarArchivoPortalAPapelera_(archivoPdf.getId(), 'PDF incompleto');
+      throw error;
+    } finally {
+      if (pdfInfo && pdfInfo.documentoId) {
+        enviarArchivoPortalAPapelera_(pdfInfo.documentoId, 'documento temporal');
+      }
+    }
+  });
+
+  if (!resultado.reutilizado) {
+    registrarLog('', resultado.idPortalCliente, 'GENERAR_PDF_PARTE_SERVICIO', 'OK', usuario + ' - ' + id + ' - ' + resultado.idDocumento);
   }
+  delete resultado.idPortalCliente;
+  return resultado;
+}
 
-  const documento = registrarDocumentoPdfParteServicio_(datos, archivoPdf, usuario);
-  registrarLog('', datos.cliente.idPortalCliente, 'GENERAR_PDF_PARTE_SERVICIO', 'OK', usuario + ' - ' + id + ' - ' + documento.ID_DOCUMENTO);
+function obtenerDocumentoPdfParteExistente_(idPublicacion) {
+  const id = normalizarTexto_(idPublicacion);
+  return leerFilasPorHeaders_(obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.DOCUMENTOS)).find(function(row) {
+    return normalizarTexto_(row.ID_PUBLICACION) === id &&
+      normalizarClave_(row.TIPO) === 'parte de servicio pdf' &&
+      esSi_(row.VISIBLE) &&
+      Boolean(normalizarTexto_(row.URL));
+  }) || null;
+}
 
-  return {
-    ok: true,
-    idDocumento: documento.ID_DOCUMENTO,
-    url: archivoPdf.getUrl(),
-    nombreArchivo: archivoPdf.getName(),
-    mensaje: 'PDF generado correctamente. El cliente ya puede abrirlo desde su portal.'
-  };
+function enviarArchivoPortalAPapelera_(archivoId, descripcion) {
+  try {
+    DriveApp.getFileById(archivoId).setTrashed(true);
+  } catch (error) {
+    Logger.log('No se pudo enviar a papelera ' + (descripcion || 'el archivo') + ': ' + error.message);
+  }
 }
 
 function obtenerDatosParteServicioPdf_(idPublicacion) {
@@ -867,7 +911,9 @@ function obtenerDatosParteServicioPdf_(idPublicacion) {
 
   const documentos = leerFilasPorHeaders_(obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.DOCUMENTOS))
     .filter(function(row) {
-      return normalizarTexto_(row.ID_PUBLICACION) === id && esSi_(row.VISIBLE);
+      return normalizarTexto_(row.ID_PUBLICACION) === id &&
+        esSi_(row.VISIBLE) &&
+        normalizarClave_(row.TIPO) !== 'parte de servicio pdf';
     })
     .map(function(row) {
       return {
@@ -992,8 +1038,7 @@ function guardarPdfParteServicio_(datos, pdfBlob) {
   return archivo;
 }
 
-function registrarDocumentoPdfParteServicio_(datos, archivoPdf, usuario) {
-  const carpetaId = obtenerCarpetaDestinoPdf_(datos);
+function registrarDocumentoPdfParteServicioSinLock_(datos, archivoPdf, usuario) {
   const idDocumento = generarId_('DOC');
   const fechaCarga = new Date();
   const fechaCargaTexto = Utilities.formatDate(fechaCarga, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
@@ -1011,7 +1056,8 @@ function registrarDocumentoPdfParteServicio_(datos, archivoPdf, usuario) {
     USUARIO_CARGA: usuario || 'ADMIN_PORTAL'
   };
 
-  appendPortalRow_(PORTAL_CONFIG.HOJAS.DOCUMENTOS, row);
+  const hojaDocumentos = obtenerHojaPortal_(PORTAL_CONFIG.HOJAS.DOCUMENTOS);
+  appendPortalRowsEnHojaSinLock_(hojaDocumentos, [row]);
   return row;
 }
 

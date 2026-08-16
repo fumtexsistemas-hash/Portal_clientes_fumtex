@@ -1381,7 +1381,8 @@
     if (!el) return;
     el.className = 'message';
     const url = res && res.url ? esc(res.url) : '';
-    const contenido = 'PDF generado correctamente. El cliente ya puede abrirlo desde su portal.' + (url ? ' <a href="' + url + '" target="_blank" rel="noopener">Abrir PDF</a>' : '');
+    const mensaje = res && res.mensaje ? esc(res.mensaje) : 'PDF generado correctamente. El cliente ya puede abrirlo desde su portal.';
+    const contenido = mensaje + (url ? ' <a href="' + url + '" target="_blank" rel="noopener">Abrir PDF</a>' : '');
     el.innerHTML = contenido;
     const resultado = document.getElementById('pdfSeleccionadoResultado');
     if (resultado) {
