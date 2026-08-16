@@ -22,12 +22,12 @@
   const ADMIN_TABS_CONFIG = [
     { id: 'visitaRapida', label: 'Nuevo parte de servicio' },
     { id: 'vistaCliente', label: 'Vista cliente' },
-    { id: 'documentos', label: 'Generar PDF / Documentos' },
     { id: 'plantillaPuntos', label: 'Plantilla de puntos' },
     { id: 'clientes', label: 'Clientes' },
     { id: 'usuarios', label: 'Usuarios' },
     { id: 'publicaciones', label: 'Carga avanzada' },
     { id: 'monitoreos', label: 'Monitoreos avanzado' },
+    { id: 'documentos', label: 'Documentos externos' },
     { id: 'visibilidad', label: 'Gestionar visibilidad' },
     { id: 'editarRegistros', label: 'Editar registros' }
   ];
@@ -1177,7 +1177,7 @@
   function actualizarSelectsClientesAdmin() {
     const clientes = window.portalAdminClientes || [];
     const ultimoCliente = sessionStorage.getItem('portalAdminUltimoCliente') || '';
-    const ids = ['selectClienteUsuario', 'selectClientePublicacion', 'selectClienteMonitoreo', 'selectClienteDocumento', 'selectClientePdf', 'selectClienteVista', 'selectClienteVisibilidad', 'selectClienteEdicion', 'selectClienteVisitaRapida', 'selectClientePlantillaPuntos'];
+    const ids = ['selectClienteUsuario', 'selectClientePublicacion', 'selectClienteMonitoreo', 'selectClienteDocumento', 'selectClienteVista', 'selectClienteVisibilidad', 'selectClienteEdicion', 'selectClienteVisitaRapida', 'selectClientePlantillaPuntos'];
     ids.forEach(function(id) {
       const select = document.getElementById(id);
       if (!select) return;
@@ -1316,7 +1316,7 @@
   }
 
 
-  function generarPdfParteServicioAdminUi(idPublicacion) {
+  function generarPdfParteServicioAdminUi(idPublicacion, button) {
     const id = String(idPublicacion || '').trim();
     const token = obtenerAdminToken();
 
@@ -1336,11 +1336,11 @@
       return;
     }
 
-    if (!confirm('Se generara un PDF del parte de servicio y se publicara en el portal del cliente. Continuar?')) return;
+    if (!confirm('Se preparara el PDF de este parte. Si ya existe, se usara el mismo archivo. ¿Continuar?')) return;
 
     window.portalPdfEnProceso = true;
-    const estadoBoton = bloquearBotonUi_(document.getElementById('btnGenerarPdfSeleccionado'), 'Generando PDF...');
-    setMessage('adminMensaje', 'Generando PDF...');
+    const estadoBoton = bloquearBotonUi_(button, 'Preparando PDF...');
+    setMessage('adminMensaje', 'Preparando PDF...');
     google.script.run
       .withSuccessHandler(function(res) {
         if (!res || !res.ok) {
@@ -1364,16 +1364,6 @@
         restaurarBotonUi_(estadoBoton);
       })
       .generarPdfParteServicioAdmin(id, token);
-  }
-
-  function generarPdfSeleccionadoAdminUi() {
-    const select = document.getElementById('selectPublicacionPdf');
-    const idPublicacion = select ? String(select.value || '').trim() : '';
-    if (!idPublicacion) {
-      setMessage('adminMensaje', 'Selecciona un parte de servicio para generar el PDF.', true);
-      return;
-    }
-    generarPdfParteServicioAdminUi(idPublicacion);
   }
 
   function mostrarMensajePdfGeneradoAdmin_(res) {
@@ -1695,7 +1685,6 @@
   function actualizarSelectsPublicacionesDependientes() {
     actualizarSelectPublicacionesPorCliente('selectClienteMonitoreo', 'selectPublicacionMonitoreo', false);
     actualizarSelectPublicacionesPorCliente('selectClienteDocumento', 'selectPublicacionDocumento', true);
-    actualizarSelectPublicacionesPorCliente('selectClientePdf', 'selectPublicacionPdf', false);
   }
 
   function actualizarSelectPublicacionesPorCliente(clienteSelectId, publicacionSelectId, permiteVacio) {
@@ -2355,7 +2344,7 @@ function renderTarjetaVisitaClienteLimpiaUi_(visita, index, contexto) {
     : 'Sin puntos de control';
   var idPublicacion = visita.idPublicacion || '';
   var accionesAdmin = contexto === 'admin' && idPublicacion
-    ? '<div class="visita-admin-actions"><button class="secondary-button" type="button" onclick="generarPdfParteServicioAdminUi(\'' + escaparAtributoClienteUi_(idPublicacion) + '\')">Generar PDF</button></div>'
+    ? '<div class="visita-admin-actions"><button class="secondary-button" type="button" onclick="generarPdfParteServicioAdminUi(\'' + escaparAtributoClienteUi_(idPublicacion) + '\', this)">Ver / descargar PDF</button></div>'
     : '';
 
   return '<article class="visita-cliente-card">' +
@@ -2639,7 +2628,6 @@ function ocultarBloqueClienteClasicoUi_(id) {
     if (advanced) advanced.open = true;
     setMessage('adminMobileMensaje', '');
     if (seccion === 'parte') mostrarPasoParteMobile(window.adminMobilePasoActual || 1);
-    if (seccion === 'pdf') actualizarPublicacionesPdfMobile();
     if (seccion === 'documento') actualizarPublicacionesDocumentoMobile();
   }
 
@@ -2684,7 +2672,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
     google.script.run
       .withSuccessHandler(function(res) {
         window.portalAdminPublicaciones = res && res.ok ? (res.publicaciones || []) : [];
-        actualizarPublicacionesPdfMobile();
+        actualizarPublicacionesDocumentoMobile();
       })
       .withFailureHandler(function(error) {
         console.error('error publicaciones mobile', error);
@@ -2696,7 +2684,6 @@ function ocultarBloqueClienteClasicoUi_(id) {
     const ids = [
       'mobileSelectClienteParte',
       'mobileSelectClienteVista',
-      'mobileSelectClientePdf',
       'mobileSelectClientePuntos',
       'mobileSelectClienteUsuario',
       'mobileSelectClienteDocumento'
@@ -2724,7 +2711,6 @@ function ocultarBloqueClienteClasicoUi_(id) {
               otro.value = select.value;
             }
           });
-          actualizarPublicacionesPdfMobile();
           actualizarPublicacionesDocumentoMobile();
         });
       }
@@ -3111,25 +3097,11 @@ function ocultarBloqueClienteClasicoUi_(id) {
     const cards = publicacionesOrdenadas.length ? publicacionesOrdenadas.map(function(pub) {
       const docs = documentos.filter(function(doc) { return doc.idPublicacion === pub.idPublicacion; });
       return '<article class="mobile-result-card"><span>' + esc(pub.fechaVisita || '') + '</span><strong>' + esc(pub.titulo || pub.tipoServicio || 'Visita') + '</strong><p>' + esc(pub.resumenCliente || '') + '</p>' +
-        '<button type="button" class="mobile-secondary-button" onclick="generarPdfParteMobile(\'' + esc(pub.idPublicacion) + '\', this)">Generar PDF</button>' +
+        '<button type="button" class="mobile-secondary-button" onclick="generarPdfParteMobile(\'' + esc(pub.idPublicacion) + '\', this)">Ver / descargar PDF</button>' +
         docs.map(function(doc) { return '<a class="mobile-link-button" target="_blank" rel="noopener" href="' + esc(doc.url || '') + '">Abrir PDF</a>'; }).join('') +
       '</article>';
     }).join('') : '<p class="muted">Sin publicaciones visibles.</p>';
     return header + cards;
-  }
-
-  function actualizarPublicacionesPdfMobile() {
-    const clienteSelect = document.getElementById('mobileSelectClientePdf');
-    const pubSelect = document.getElementById('mobileSelectPublicacionPdf');
-    if (!clienteSelect || !pubSelect) return;
-    const idCliente = clienteSelect.value;
-    pubSelect.innerHTML = '';
-    pubSelect.appendChild(crearOption('', 'Selecciona publicacion'));
-    (window.portalAdminPublicaciones || []).filter(function(pub) {
-      return !idCliente || pub.idPortalCliente === idCliente;
-    }).forEach(function(pub) {
-      pubSelect.appendChild(crearOption(pub.idPublicacion, textoPublicacionMobile_(pub)));
-    });
   }
 
   function actualizarPublicacionesDocumentoMobile() {
@@ -3267,19 +3239,9 @@ function ocultarBloqueClienteClasicoUi_(id) {
     return [pub.fechaVisita, pub.tipoServicio, pub.sucursal, pub.idPublicacion].filter(Boolean).join(' - ');
   }
 
-  function generarPdfDesdeSelectMobile(button) {
-    const id = document.getElementById('mobileSelectPublicacionPdf').value;
-    if (!id) {
-      setMessage('adminMobileMensaje', 'Selecciona una publicacion.', true);
-      return;
-    }
-    generarPdfParteMobile(id, button);
-  }
-
   function generarPdfParteMobile(idPublicacion, button) {
     const id = idPublicacion || (window.adminMobileUltimaPublicacion && window.adminMobileUltimaPublicacion.idPublicacion) || '';
     const token = obtenerAdminToken();
-    const target = document.getElementById('mobilePdfResultado');
     if (!id) {
       setMessage('adminMobileMensaje', 'No hay una publicacion para generar PDF.', true);
       return;
@@ -3288,10 +3250,10 @@ function ocultarBloqueClienteClasicoUi_(id) {
       setMessage('adminMobileMensaje', 'Ya se esta generando un PDF. Espera a que termine.', true);
       return;
     }
-    if (!confirm('Se generara y publicara el PDF en el portal del cliente. ¿Continuar?')) return;
+    if (!confirm('Se preparara el PDF de este parte. Si ya existe, se usara el mismo archivo. ¿Continuar?')) return;
     window.adminMobilePdfEnProceso = true;
-    const estadoBoton = bloquearBotonUi_(button || document.getElementById('mobileGenerarPdfButton'), 'Generando PDF...');
-    setMessage('adminMobileMensaje', 'Generando PDF...');
+    const estadoBoton = bloquearBotonUi_(button, 'Preparando PDF...');
+    setMessage('adminMobileMensaje', 'Preparando PDF...');
     google.script.run
       .withSuccessHandler(function(res) {
         if (!res || !res.ok) {
@@ -3300,10 +3262,7 @@ function ocultarBloqueClienteClasicoUi_(id) {
           restaurarBotonUi_(estadoBoton);
           return;
         }
-        setMessage('adminMobileMensaje', res.mensaje || 'PDF generado correctamente.');
-        if (target) {
-          target.innerHTML = '<article class="mobile-result-card"><strong>' + esc(res.nombreArchivo || 'PDF generado') + '</strong><a class="mobile-link-button" target="_blank" rel="noopener" href="' + esc(res.url || '') + '">Abrir PDF</a></article>';
-        }
+        mostrarMensajePdfMobile_(res);
         window.adminMobilePdfEnProceso = false;
         restaurarBotonUi_(estadoBoton);
         cargarPublicacionesAdminMobile();
@@ -3314,6 +3273,15 @@ function ocultarBloqueClienteClasicoUi_(id) {
         restaurarBotonUi_(estadoBoton);
       })
       .generarPdfParteServicioAdmin(id, token);
+  }
+
+  function mostrarMensajePdfMobile_(res) {
+    const target = document.getElementById('adminMobileMensaje');
+    if (!target) return;
+    const url = res && res.url ? esc(res.url) : '';
+    const mensaje = esc(res && res.mensaje ? res.mensaje : 'PDF disponible.');
+    target.className = 'message';
+    target.innerHTML = mensaje + (url ? ' <a class="mobile-link-button" target="_blank" rel="noopener" href="' + url + '">Abrir / descargar PDF</a>' : '');
   }
 
   function cargarPlantillaPuntosMobile() {

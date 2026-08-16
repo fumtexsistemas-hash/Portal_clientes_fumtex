@@ -49,7 +49,6 @@
         <nav class="mobile-action-tabs" aria-label="Acciones mobile">
           <button type="button" class="active" data-mobile-section="parte" onclick="mostrarSeccionAdminMobile('parte')">Nuevo parte</button>
           <button type="button" data-mobile-section="vista" onclick="mostrarSeccionAdminMobile('vista')">Vista cliente</button>
-          <button type="button" data-mobile-section="pdf" onclick="mostrarSeccionAdminMobile('pdf')">Generar PDF</button>
           <button type="button" data-mobile-section="puntos" onclick="mostrarSeccionAdminMobile('puntos')">Plantilla</button>
         </nav>
         <details id="mobileAdvancedActions" class="mobile-advanced-actions">
@@ -57,7 +56,7 @@
           <div class="mobile-action-tabs mobile-action-tabs-secondary">
             <button type="button" data-mobile-section="cliente" onclick="mostrarSeccionAdminMobile('cliente')">Cliente</button>
             <button type="button" data-mobile-section="usuario" onclick="mostrarSeccionAdminMobile('usuario')">Usuario</button>
-            <button type="button" data-mobile-section="documento" onclick="mostrarSeccionAdminMobile('documento')">Documento</button>
+            <button type="button" data-mobile-section="documento" onclick="mostrarSeccionAdminMobile('documento')">Documentos externos</button>
           </div>
         </details>
 
@@ -167,7 +166,7 @@
             <p id="mobilePostSaveDetalle" class="muted"></p>
             <div class="mobile-stack-actions">
               <button class="mobile-secondary-button" type="button" onclick="verComoClienteMobile()">Ver como cliente</button>
-              <button class="mobile-secondary-button" type="button" onclick="generarPdfParteMobile('', this)">Generar PDF</button>
+              <button class="mobile-secondary-button" type="button" onclick="generarPdfParteMobile('', this)">Ver / descargar PDF</button>
               <button class="mobile-primary-button" type="button" onclick="cargarOtroParteMobile()">Cargar otro parte</button>
             </div>
           </div>
@@ -310,24 +309,6 @@
             </label>
             <button id="mobileVistaClienteButton" class="mobile-primary-button" type="button" onclick="cargarVistaClienteMobile()">Ver visitas</button>
             <div id="mobileVistaClienteResultado" class="mobile-card-list"></div>
-          </div>
-        </section>
-
-        <section id="adminMobileSection-pdf" class="mobile-section hidden">
-          <div class="panel mobile-panel-card">
-            <h2>Generar PDF desde visita</h2>
-            <label>Cliente
-              <select id="mobileSelectClientePdf" onchange="actualizarPublicacionesPdfMobile()">
-                <option value="">Selecciona cliente</option>
-              </select>
-            </label>
-            <label>Visita / publicacion
-              <select id="mobileSelectPublicacionPdf">
-                <option value="">Selecciona publicacion</option>
-              </select>
-            </label>
-            <button id="mobileGenerarPdfButton" class="mobile-primary-button" type="button" onclick="generarPdfDesdeSelectMobile(this)">Generar PDF</button>
-            <div id="mobilePdfResultado" class="mobile-card-list"></div>
           </div>
         </section>
 

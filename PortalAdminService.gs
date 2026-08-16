@@ -836,7 +836,7 @@ function generarPdfParteServicioAdmin(idPublicacion, adminToken) {
         idDocumento: documentoExistente.ID_DOCUMENTO,
         url: documentoExistente.URL,
         nombreArchivo: documentoExistente.TITULO,
-        mensaje: 'Este parte ya tenia un PDF generado. Se abrio el documento existente.'
+        mensaje: 'Este parte ya tenia un PDF generado. Podes abrir el documento existente.'
       };
     }
 
